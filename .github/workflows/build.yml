@@ -87,7 +87,13 @@ jobs:
           gradle :sender:assembleRelease --stacktrace --info 2>&1 | tee /tmp/sender-build.log
           EXIT=${PIPESTATUS[0]}
           echo "Sender build exit code: $EXIT"
-          cat /tmp/sender-build.log | tail -n 300
+          echo "=== Sender e: lines (grep) ==="
+          grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 200 || echo "no e: lines"
+          grep -n "error:" /tmp/sender-build.log 2>&1 | head -n 100 || true
+          echo "=== Sender FAILED/context 20 lines ==="
+          grep -n "FAILED" /tmp/sender-build.log 2>&1 | head -n 20 || true
+          # Also dump tail 500 for context
+          cat /tmp/sender-build.log | tail -n 500
           ls sender/build/outputs/apk/release/*.apk 2>&1 | head -n 20
           exit $EXIT
 
@@ -106,6 +112,9 @@ jobs:
           gradle :receiver:assembleRelease --stacktrace --info 2>&1 | tee /tmp/receiver-build.log
           EXIT=${PIPESTATUS[0]}
           echo "Receiver build exit code: $EXIT"
+          echo "=== Receiver e: lines ==="
+          grep -n "^e: " /tmp/receiver-build.log 2>&1 | head -n 200 || echo "no e: lines"
+          grep -n "error:" /tmp/receiver-build.log 2>&1 | head -n 100 || true
           cat /tmp/receiver-build.log | tail -n 500
           echo "=== Receiver outputs ==="
           find . -maxdepth 4 -name "*.apk" -o -name "*.aab" | head -n 20
@@ -118,7 +127,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
-          path: /tmp/*-build.log
+          path: |
+            /tmp/sender-build.log
+            /tmp/receiver-build.log
+          if-no-files-found: warn
       - name: Extract e: lines from build logs
         if: failure()
         run: |
