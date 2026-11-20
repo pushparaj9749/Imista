@@ -14,6 +14,13 @@ object PairingValidator {
         } catch (e: Exception) { false }
     }
 
+    /** Relay-issued short pairing codes are exactly 6 digits. */
+    fun isValidPairingCode(code: String): Boolean = code.matches(Regex("^\\d{6}$"))
+
+    /** Accepts either a legacy UUID pairing id or a new 6-digit relay code. */
+    fun isAcceptablePairingId(id: String): Boolean =
+        isValidPairingId(id) || isValidPairingCode(id)
+
     fun isValidBotToken(token: String): Boolean {
         // Telegram bot token format: 123456789:ABC-DEF...
         return token.matches(Regex("^\\d+:[A-Za-z0-9_\\-]+$")) && token.length in 20..60

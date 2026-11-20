@@ -19,6 +19,8 @@ data class SetupState(
     val deviceAdminEnabled: Boolean = false,
     val pairingId: String = "",
     val relayUrl: String = "",
+    val botUsername: String? = null,
+    val telegramLinked: Boolean = false,
     val verificationStatus: String? = null,
     val isVerifying: Boolean = false,
     val canStartForwarding: Boolean = false,
@@ -30,7 +32,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx = getApplication<Application>()
 
     private val _state = MutableStateFlow(SetupState(
-        pairingId = secure.pairingId ?: UUID.randomUUID().toString(),
+        pairingId = secure.pairingId ?: "",
         relayUrl = secure.relayUrl,
         showBlackScreen = secure.onboardingComplete && secure.forwardingActive
     ))
@@ -52,12 +54,75 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /**
+     * Asks the relay for a fresh 6-digit pairing code. Nothing is typed by the
+     * user and no bot token is involved — the code is shared with the Receiver.
+     */
     fun generateNewPairing() {
-        val newId = UUID.randomUUID().toString()
-        secure.pairingId = newId
-        _state.value = _state.value.copy(pairingId = newId, verificationStatus = null, canStartForwarding = false)
-        // Register with relay immediately
-        registerPairing()
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isVerifying = true, verificationStatus = "Code ban raha hai…")
+            val relay = RelayRepository(secure.relayUrl)
+            val res = relay.register(null, secure.deviceId, secure.deviceName, "SENDER")
+            if (res.isFailure) {
+                _state.value = _state.value.copy(
+                    isVerifying = false,
+                    verificationStatus = "Relay se code nahi mila: ${res.exceptionOrNull()?.message}"
+                )
+                return@launch
+            }
+            val pairing = res.getOrNull()?.pairing
+            val code = pairing?.code ?: pairing?.pairingId ?: ""
+            if (code.isBlank()) {
+                _state.value = _state.value.copy(isVerifying = false, verificationStatus = "Relay ne code nahi diya")
+                return@launch
+            }
+            secure.pairingId = code
+            _state.value = _state.value.copy(
+                pairingId = code,
+                isVerifying = false,
+                botUsername = pairing?.botUsername ?: _state.value.botUsername,
+                telegramLinked = pairing?.telegramLinked == true,
+                verificationStatus = "Code: $code — Receiver me yahi daalo",
+                canStartForwarding = _state.value.notificationEnabled
+            )
+        }
+    }
+
+    /** Auto-links the Telegram chat after the user pressed /start on the bot. */
+    fun linkTelegram() {
+        viewModelScope.launch {
+            val code = secure.pairingId ?: _state.value.pairingId
+            if (code.isBlank()) {
+                _state.value = _state.value.copy(verificationStatus = "Pehle code generate karo")
+                return@launch
+            }
+            _state.value = _state.value.copy(isVerifying = true, verificationStatus = "Telegram check ho raha hai…")
+            val relay = RelayRepository(secure.relayUrl)
+            repeat(6) { attempt ->
+                val res = relay.link(code)
+                if (res.isSuccess && res.getOrNull()?.linked == true) {
+                    _state.value = _state.value.copy(
+                        isVerifying = false,
+                        telegramLinked = true,
+                        verificationStatus = "✅ Telegram jud gaya — forwards wahan bhi aayengi"
+                    )
+                    return@launch
+                }
+                if (attempt < 5) kotlinx.coroutines.delay(4000)
+            }
+            _state.value = _state.value.copy(
+                isVerifying = false,
+                verificationStatus = "Telegram link nahi hua — bot ko /start karke phir try karo"
+            )
+        }
+    }
+
+    fun loadBotInfo() {
+        viewModelScope.launch {
+            RelayRepository(secure.relayUrl).botInfo().onSuccess { info ->
+                _state.value = _state.value.copy(botUsername = info.username)
+            }
+        }
     }
 
     fun registerPairing() {
@@ -65,14 +130,14 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = _state.value.copy(isVerifying = true, verificationStatus = "Registering with secure relay...")
             val pairingId = _state.value.pairingId
             if (pairingId.isBlank()) {
-                _state.value = _state.value.copy(isVerifying = false, verificationStatus = "Pairing ID empty")
+                _state.value = _state.value.copy(isVerifying = false, verificationStatus = "Pehle Generate dabao — relay code dega")
                 return@launch
             }
             secure.pairingId = pairingId
             val relay = RelayRepository(secure.relayUrl)
             val res = relay.register(pairingId, secure.deviceId, secure.deviceName, "SENDER")
             if (res.isSuccess) {
-                _state.value = _state.value.copy(isVerifying = false, verificationStatus = "✅ Paired with relay. Share this ID with Receiver: $pairingId", canStartForwarding = _state.value.notificationEnabled)
+                _state.value = _state.value.copy(isVerifying = false, verificationStatus = "✅ Relay se jud gaya. Receiver me code daalo: $pairingId", canStartForwarding = _state.value.notificationEnabled)
             } else {
                 _state.value = _state.value.copy(isVerifying = false, verificationStatus = "Relay register failed: ${res.exceptionOrNull()?.message}. Check relay URL & internet.")
             }
@@ -122,13 +187,15 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updatePairingId(newId: String) {
-        // Validate UUID
-        if (newId.isNotBlank() && !PairingValidator.isValidPairingId(newId.trim())) {
-            _state.value = _state.value.copy(verificationStatus = "Invalid pairing ID format (must be UUID)")
+        // Relay codes are 6 digits; legacy UUID ids are still accepted.
+        val trimmed = newId.filter { it.isDigit() }.take(6)
+        if (trimmed.isNotBlank() && !PairingValidator.isAcceptablePairingId(trimmed) && !PairingValidator.isAcceptablePairingId(newId.trim())) {
+            _state.value = _state.value.copy(verificationStatus = "Code 6 digits ka hona chahiye")
             return
         }
-        secure.pairingId = newId.trim()
-        _state.value = _state.value.copy(pairingId = newId.trim(), verificationStatus = null)
+        val finalId = if (trimmed.isNotBlank()) trimmed else newId.trim()
+        secure.pairingId = finalId
+        _state.value = _state.value.copy(pairingId = finalId, verificationStatus = null)
     }
 
     private fun isNotificationEnabled(): Boolean {

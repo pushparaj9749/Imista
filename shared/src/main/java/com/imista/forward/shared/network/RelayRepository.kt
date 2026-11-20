@@ -27,19 +27,46 @@ class RelayRepository(
 
     private fun String.ensureEndsWithSlash(): String = if (endsWith("/")) this else "$this/"
 
-    suspend fun register(pairingId: String, deviceId: String, deviceName: String, role: String): Result<RegisterResponse> {
+    /**
+     * Registers this device. Senders pass no [code] and the relay mints a short
+     * 6-digit pairing code; receivers pass the code shown on the Sender.
+     */
+    suspend fun register(
+        code: String?,
+        deviceId: String,
+        deviceName: String,
+        role: String
+    ): Result<RegisterResponse> {
         return try {
-            val resp = api.register(RegisterRequest(pairingId, deviceId, deviceName, role))
+            val resp = api.register(RegisterRequest(code = code, deviceId = deviceId, deviceName = deviceName, role = role))
             if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
             else Result.failure(Exception(resp.body()?.error ?: resp.errorBody()?.string() ?: "Register failed"))
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun getPairing(pairingId: String): Result<RegisterResponse> {
+    suspend fun getPairing(code: String): Result<RegisterResponse> {
         return try {
-            val resp = api.getPairing(pairingId)
+            val resp = api.getPairing(code)
             if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
             else Result.failure(Exception(resp.body()?.error ?: "Pairing not found"))
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    /** Auto-links the Telegram chat once the user pressed the bot's /start deep link. */
+    suspend fun link(code: String): Result<LinkResponse> {
+        return try {
+            val resp = api.link(code)
+            if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
+            else Result.failure(Exception(resp.body()?.error ?: "Link failed"))
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    /** Bot username + whether the relay has its Telegram token configured. */
+    suspend fun botInfo(): Result<RelayBotInfo> {
+        return try {
+            val resp = api.bot()
+            if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
+            else Result.failure(Exception("Bot info unavailable"))
         } catch (e: Exception) { Result.failure(e) }
     }
 

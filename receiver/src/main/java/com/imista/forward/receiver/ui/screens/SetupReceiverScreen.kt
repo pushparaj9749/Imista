@@ -19,19 +19,19 @@ fun SetupReceiverScreen(vm: SetupViewModelReceiver = viewModel()) {
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Text("Receiver Pairing — Secure Relay", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        Text("Enter same Pairing ID as Sender. Relay holds Telegram token server-side, auto-configured via GitHub Secret. No manual token entry.", color = Color(0xFF94A3B8), fontSize = 13.sp)
+        Text("Sender pe jo 6-digit code dikhega wahi yahan daalo. Koi bot token ya chat ID nahi chahiye — sab relay pe server-side hai.", color = Color(0xFF94A3B8), fontSize = 13.sp)
         Spacer(Modifier.height(12.dp))
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2F))) {
             Column(Modifier.padding(14.dp)) {
                 Text("How pairing works", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("1. Sender generates Pairing ID and registers with relay (relay has TELEGRAM_BOT_KEY)\n2. Copy same ID to Receiver and Register\n3. Sender forwards → relay stores + forwards to Telegram → Receiver polls relay (no competing getUpdates consumers)", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                Text("1. Sender app kholo → relay 6-digit code deta hai\n2. Wahi code yahan daalo → jud gaye\n3. Sender ka notification → relay store karta hai → Receiver poll karta hai\n4. Telegram bhi chahiye to Connect screen se ek tap me link ho jayega", fontSize = 12.sp, color = Color(0xFF94A3B8))
             }
         }
         Spacer(Modifier.height(16.dp))
-        OutlinedTextField(value = state.pairingId, onValueChange = { vm.updatePairingId(it) }, label = { Text("Pairing ID") }, placeholder = { Text("Paste Sender's pairing ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = state.pairingId, onValueChange = { vm.updatePairingId(it) }, label = { Text("6-digit code") }, placeholder = { Text("123456") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { vm.generateNew() }, modifier = Modifier.weight(1f)) { Text("Generate") }
+            OutlinedButton(onClick = { vm.generateNew() }, modifier = Modifier.weight(1f)) { Text("Clear") }
             Button(onClick = { vm.saveAndRegister() }, modifier = Modifier.weight(1f), enabled = !state.isLoading) {
                 if (state.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp) else Text("Register")
             }
@@ -47,7 +47,7 @@ fun SetupReceiverScreen(vm: SetupViewModelReceiver = viewModel()) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text("After pairing, Receiver polls relay every 15 min (WorkManager) + on demand. No need to enter Chat ID — relay auto-handles Telegram delivery via server token. Both apps use same infrastructure.", fontSize = 12.sp, color = Color(0xFF94A3B8))
+        Text("Pairing ke baad Receiver har 15 min me relay poll karta hai (WorkManager) aur screen kholte hi turant. Koi Chat ID/token entry nahi — Telegram delivery relay server-side handle karta hai.", fontSize = 12.sp, color = Color(0xFF94A3B8))
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = { vm.clear() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))) { Text("Clear Pairing") }
     }

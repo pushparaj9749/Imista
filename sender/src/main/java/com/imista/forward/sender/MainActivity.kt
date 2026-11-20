@@ -154,9 +154,13 @@ fun SenderRoot(secure: SecureStorage, setupVm: SetupViewModel) {
                 onOpenSettings = { nav.navigate("settings") }
             )
         }
+        composable("connection") {
+            com.imista.forward.sender.ui.screens.TelegramConfigScreen(onBack = { nav.popBackStack() })
+        }
         composable("settings") {
             MinimalSettingsScreen(
                 vm = setupVm,
+                onOpenConnection = { nav.navigate("connection") },
                 onBack = { nav.popBackStack() },
                 onReset = {
                     nav.navigate("setup") {

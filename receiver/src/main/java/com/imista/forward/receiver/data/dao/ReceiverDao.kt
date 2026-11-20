@@ -22,6 +22,9 @@ interface ReceivedDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: ReceivedNotificationEntity)
 
+    @Query("SELECT EXISTS(SELECT 1 FROM received_notifications WHERE id = :id)")
+    suspend fun exists(id: String): Boolean
+
     @Query("UPDATE received_notifications SET isRead = 1 WHERE id = :id")
     suspend fun markRead(id: String)
 

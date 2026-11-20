@@ -82,7 +82,7 @@ fun BlackScreen(vm: SetupViewModel = viewModel(), onOpenSettings: () -> Unit) {
 }
 
 @Composable
-fun MinimalSettingsScreen(vm: SetupViewModel = viewModel(), onBack: () -> Unit, onReset: () -> Unit) {
+fun MinimalSettingsScreen(vm: SetupViewModel = viewModel(), onBack: () -> Unit, onReset: () -> Unit, onOpenConnection: () -> Unit = {}) {
     val state by vm.state.collectAsState()
     Column(Modifier.fillMaxSize().background(Color(0xFF0B0B14)).padding(16.dp)) {
         Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -98,6 +98,10 @@ fun MinimalSettingsScreen(vm: SetupViewModel = viewModel(), onBack: () -> Unit, 
                 Text("Notification Access: ${if (state.notificationEnabled) "Granted" else "Missing"}", color = if (state.notificationEnabled) Color(0xFF10B981) else Color(0xFFEF4444), fontSize = 12.sp)
                 Text("Device Admin: ${if (state.deviceAdminEnabled) "Active" else "Inactive"}", color = Color(0xFF94A3B8), fontSize = 12.sp)
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onOpenConnection, modifier = Modifier.fillMaxWidth()) {
+            Text("Connection & Telegram (optional)")
         }
         Spacer(Modifier.height(16.dp))
         Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Back to Black Screen") }

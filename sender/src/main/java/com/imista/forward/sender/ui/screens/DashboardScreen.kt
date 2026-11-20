@@ -79,7 +79,7 @@ fun DashboardScreen(
             Text("Quick Actions", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction("Telegram Configuration", "Bot token & Chat ID", Icons.Default.Send) { onNavigate("telegram") }
+                QuickAction("Connection & Telegram", "Pairing status (server-side token)", Icons.Default.Send) { onNavigate("telegram") }
                 QuickAction("Notification Access", "Allow reading notifications", Icons.Default.Notifications) { onNavigate("notification_access") }
                 QuickAction("App Selection", "Choose apps to forward", Icons.Default.Apps) { onNavigate("app_selection") }
                 QuickAction("Device Admin", "Optional protection", Icons.Default.Security) { onNavigate("device_admin") }

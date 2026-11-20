@@ -5,7 +5,8 @@ import retrofit2.Response
 import retrofit2.http.*
 
 data class RegisterRequest(
-    val pairingId: String,
+    val pairingId: String? = null,
+    val code: String? = null,
     val deviceId: String,
     val deviceName: String,
     val role: String // SENDER or RECEIVER
@@ -17,9 +18,31 @@ data class RegisterResponse(
     val error: String?
 )
 
+data class LinkResponse(
+    val ok: Boolean,
+    val linked: Boolean?,
+    val chatId: String?,
+    val reason: String?,
+    val error: String?
+)
+
+data class RelayBotInfo(
+    val ok: Boolean,
+    val telegramConfigured: Boolean?,
+    val username: String?
+)
+
 data class PairingResult(
-    val pairingId: String?,
-    val status: String?
+    val pairingId: String? = null,
+    val status: String? = null,
+    val code: String? = null,
+    val role: String? = null,
+    val deviceName: String? = null,
+    val telegramLinked: Boolean? = null,
+    val botUsername: String? = null,
+    val linkUrl: String? = null,
+    val senderJoined: Boolean? = null,
+    val receiverJoined: Boolean? = null
 )
 
 data class ForwardRequest(
@@ -65,7 +88,14 @@ interface RelayApi {
     suspend fun register(@Body req: RegisterRequest): Response<RegisterResponse>
 
     @GET("api/register")
-    suspend fun getPairing(@Query("pairingId") pairingId: String): Response<RegisterResponse>
+    suspend fun getPairing(@Query("code") code: String): Response<RegisterResponse>
+
+    /** Asks the relay to auto-link the Telegram chat after the user pressed /start &lt;code&gt;. */
+    @GET("api/link")
+    suspend fun link(@Query("code") code: String): Response<LinkResponse>
+
+    @GET("api/bot")
+    suspend fun bot(): Response<RelayBotInfo>
 
     @POST("api/forward")
     suspend fun forward(

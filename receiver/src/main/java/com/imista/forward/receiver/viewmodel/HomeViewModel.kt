@@ -15,7 +15,10 @@ data class HomeState(
     val lastReceived: Long? = null,
     val totalReceived: Int = 0,
     val unread: Int = 0,
-    val botUsername: String? = null
+    val botUsername: String? = null,
+    val pairingCode: String? = null,
+    val relayReachable: Boolean = false,
+    val lastError: String? = null
 )
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -31,14 +34,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         viewModelScope.launch {
             val listener = isListenerEnabled()
-            val connected = secure.isConfigured()
+            val status = statusPrefs()
+            val connected = status.getBoolean("paired", false)
             val total = try { db.receivedDao().totalCount() } catch (_: Exception) { 0 }
             _state.value = _state.value.copy(
                 isListenerEnabled = listener,
                 telegramConnected = connected,
                 lastReceived = if (secure.lastReceived != 0L) secure.lastReceived else null,
-                totalReceived = total
+                totalReceived = total,
+                pairingCode = secure.pairingId,
+                relayReachable = connected,
+                lastError = status.getString("last_error", null)
             )
+            // Pull from the relay as soon as the screen is opened.
+            if (secure.isConfigured()) {
+                com.imista.forward.receiver.service.RelayPollingService.enqueueOnce(ctx)
+            }
         }
         viewModelScope.launch {
             db.receivedDao().unreadCount().collect { unread ->
@@ -46,6 +57,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    private fun statusPrefs() =
+        ctx.getSharedPreferences("imista_receiver_status", android.content.Context.MODE_PRIVATE)
 
     private fun isListenerEnabled(): Boolean {
         val flat = Settings.Secure.getString(ctx.contentResolver, "enabled_notification_listeners")

@@ -35,25 +35,36 @@ jobs:
           echo "----- current report -----"; cat "$OUT"
           cp "$OUT" /tmp/health.md
 
-      - name: End-to-end round trip
+      - name: End-to-end round trip (code pairing)
         run: |
           set -u
-          PAIR="11111111-2222-3333-4444-555555555555"
           SENDER="sender-ci"
           RECEIVER="receiver-ci"
           OUT=/tmp/e2e.md
           echo "" > "$OUT"
           log() { echo "$1"; echo "$1" >> "$OUT"; }
 
-          log "#### Register sender"
+          log "#### Sender registers without code → relay mints 6-digit code"
           R1=$(curl -sS -m 30 -X POST "$RELAY/api/register" -H 'Content-Type: application/json' \
-            -d "{\"pairingId\":\"$PAIR\",\"deviceId\":\"$SENDER\",\"role\":\"SENDER\"}")
+            -d "{\"deviceId\":\"$SENDER\",\"deviceName\":\"CI sender\",\"role\":\"SENDER\"}")
           log "\`$R1\`"
+          PAIR=$(echo "$R1" | sed -n 's/.*"code":"\([0-9]\{6\}\)".*/\1/p')
+          log "parsed code: \`$PAIR\`"
+          if [ -z "$PAIR" ]; then log "❌ relay did not return a 6-digit code"; exit 0; fi
 
-          log "#### Register receiver"
+          log "#### Receiver joins with that code"
           R2=$(curl -sS -m 30 -X POST "$RELAY/api/register" -H 'Content-Type: application/json' \
-            -d "{\"pairingId\":\"$PAIR\",\"deviceId\":\"$RECEIVER\",\"role\":\"RECEIVER\"}")
+            -d "{\"code\":\"$PAIR\",\"deviceId\":\"$RECEIVER\",\"deviceName\":\"CI receiver\",\"role\":\"RECEIVER\"}")
           log "\`$R2\`"
+
+          log "#### Receiver with a bogus code must fail"
+          B=$(curl -sS -m 30 -X POST "$RELAY/api/register" -H 'Content-Type: application/json' \
+            -d '{"code":"000000","deviceId":"nobody","role":"RECEIVER"}')
+          log "\`$B\`"
+
+          log "#### Link status (no token on device)"
+          L=$(curl -sS -m 30 "$RELAY/api/link?code=$PAIR")
+          log "\`$L\`"
 
           log "#### Forward a notification"
           MSGID="ci-$(date +%s)"
@@ -72,6 +83,7 @@ jobs:
           log "status=$U body=\`$(cat /tmp/u.txt)\`"
 
           echo "$P" | grep -q "$MSGID" && log "✅ message reached receiver via poll" || log "❌ message NOT found in poll"
+          echo "$R1" | grep -q '"code"' && log "✅ sender got a relay-minted code (no manual token/chat id)" || log "❌ no code minted"
 
       - name: Publish report to tracking issue
         env:

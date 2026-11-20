@@ -83,8 +83,8 @@ fun SetupScreen(vm: SetupViewModel = viewModel(), onDone: () -> Unit) {
                 OutlinedTextField(
                     value = state.pairingId,
                     onValueChange = { vm.updatePairingId(it) },
-                    label = { Text("Pairing ID (UUID)") },
-                    placeholder = { Text("auto-generated") },
+                    label = { Text("6-digit pairing code") },
+                    placeholder = { Text("Generate dabao") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -92,11 +92,26 @@ fun SetupScreen(vm: SetupViewModel = viewModel(), onDone: () -> Unit) {
                 Text("Relay: ${state.relayUrl}", fontSize = 11.sp, color = Color(0xFF64748B))
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = { vm.generateNewPairing() }, modifier = Modifier.weight(1f)) { Text("Generate New") }
-                    Button(onClick = { vm.registerPairing() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))) { Text("Register") }
+                    OutlinedButton(onClick = { vm.generateNewPairing() }, modifier = Modifier.weight(1f)) { Text("Naya code") }
+                    Button(onClick = { vm.registerPairing() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))) { Text("Re-register") }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Share this Pairing ID with Receiver (copy or QR). Receiver enters same ID to join same relay channel.", fontSize = 12.sp, color = Color(0xFFFBBF24))
+                Text("Ye 6-digit code Receiver me daalo. Bas. Koi token/chat ID kisi bhi phone pe type nahi karna.", fontSize = 12.sp, color = Color(0xFFFBBF24))
+                state.botUsername?.let { bot ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        if (state.telegramLinked) "✅ Telegram chat linked"
+                        else "Telegram pe bhi chahiye? (optional) — @$bot ko /start bhejo, phir Link dabao.",
+                        fontSize = 12.sp, color = Color(0xFF94A3B8)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Button(
+                        onClick = { vm.linkTelegram() },
+                        enabled = !state.isVerifying,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
+                    ) { Text(if (state.telegramLinked) "Telegram linked" else "Link Telegram (optional)") }
+                }
             }
         }
 
@@ -120,7 +135,7 @@ fun SetupScreen(vm: SetupViewModel = viewModel(), onDone: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Relay holds TELEGRAM_BOT_KEY server-side (from GitHub Secret). APK never contains token. Both apps use same relay → Telegram. Handles rate-limit, retry, polling offsets without competing consumers.", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                Text("Telegram token sirf relay server pe hai (Supabase secret). Phone/APK me kabhi nahi. Pairing ke liye sirf 6-digit code. Forward relay → Receiver, aur Telegram optional.", fontSize = 12.sp, color = Color(0xFF94A3B8))
             }
         }
 

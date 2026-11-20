@@ -35,13 +35,21 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
                         Column { Text("Imista Forward", color = Color.White, fontWeight = FontWeight.Bold, fontSize=18.sp); Text("Receiver • Private Inbox", color = Color.White.copy(alpha=0.8f), fontSize=13.sp) }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Text(if (state.telegramConnected) "● Listening for Telegram forwards" else "● Configure Telegram to start", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (state.telegramConnected) "● Relay connected — receiving forwards" else "● Paired nahi hai — Connect Receiver dabao", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    state.pairingCode?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text("Pairing code: $it", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                    state.lastError?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Last error: $it", color = Color(0xFFFCA5A5), fontSize = 11.sp)
+                    }
                 }
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatusCard("Telegram", if (state.telegramConnected) "Connected" else "Setup needed", state.telegramConnected, modifier = Modifier.weight(1f))
+                StatusCard("Relay", if (state.telegramConnected) "Connected" else "Pairing needed", state.telegramConnected, modifier = Modifier.weight(1f))
                 StatusCard("Listener", if (state.isListenerEnabled) "Enabled" else "Optional", state.isListenerEnabled, modifier = Modifier.weight(1f))
             }
         }
@@ -62,7 +70,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
             Text("Quick Actions", fontWeight=FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickRow("Connection Setup", "Bot token & Chat ID", Icons.Default.Link) { onNavigate("connection") }
+                QuickRow("Connect Receiver", "6-digit code se pairing", Icons.Default.Link) { onNavigate("connection") }
                 QuickRow("Notification Feed", "Browse forwarded content", Icons.Default.Inbox) { onNavigate("feed") }
                 QuickRow("App Filters", "Filter by app", Icons.Default.FilterList) { onNavigate("filters") }
                 QuickRow("Privacy", "Retention & preview", Icons.Default.Lock) { onNavigate("privacy") }
@@ -75,7 +83,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
             }
         }
         if (recent.isEmpty()) {
-            item { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2F)), modifier = Modifier.fillMaxWidth()) { Text("No notifications yet. Ensure Sender is forwarding and your Telegram notifications are enabled for the bot.", modifier = Modifier.padding(16.dp), fontSize=13.sp, color=Color(0xFF94A3B8)) } }
+            item { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2F)), modifier = Modifier.fillMaxWidth()) { Text("Abhi kuch nahi aaya. Sender pe forwarding ON hai na? Code same hai na? Phir bhi na aaye to Connect screen se \"Fetch now\" dabao.", modifier = Modifier.padding(16.dp), fontSize=13.sp, color=Color(0xFF94A3B8)) } }
         } else {
             items(recent.take(5)) { item ->
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2F)), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
