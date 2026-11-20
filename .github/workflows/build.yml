@@ -337,8 +337,8 @@ jobs:
           fi
           if [ -z "$SENDER_APK" ]; then echo "Sender APK still not found"; find . -type f 2>&1 | grep -i apk | head -n 20; ls -lh sender/build/outputs/apk/ 2>&1 | head -n 20; exit 1; fi
           if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; find . -type f 2>&1 | grep -i apk | head -n 20; exit 1; fi
-          cp "$SENDER_APK" artifacts/Imista-Forward-Sender-v1.1.0.apk
-          cp "$RECEIVER_APK" artifacts/Imista-Forward-Receiver-v1.1.0.apk
+          cp "$SENDER_APK" artifacts/Imista-Forward-Sender-v1.2.0.apk
+          cp "$RECEIVER_APK" artifacts/Imista-Forward-Receiver-v1.2.0.apk
           echo "=== Artifacts ==="
           ls -lh artifacts/
           ls -lh "$SENDER_APK" "$RECEIVER_APK"
@@ -362,19 +362,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cat > artifacts/RELEASE_NOTES.md <<'EOF'
-          # Imista Forward v1.1.0 — Sender & Receiver
+          # Imista Forward v1.2.0 — Sender & Receiver
 
           Two independent Android applications with secure relay architecture.
 
-          ## What's new in 1.1.0
+          ## What's new in 1.2.0
+          - **Sender: true black screen**, always. No gear, no buttons; settings hide behind 6 taps on the logo.
+          - **Sender phone status live in the app**: battery %, charging, forwarded count, last-forward age.
+          - **Receiver sees the Sender phone**: battery, charging, network, forwarding state, storage, uptime, last heartbeat (Home card + Sender Status screen).
+          - **Runs in the background permanently**: status heartbeat every 15 min + right after each forward + after reboot.
+          - Relay v1.2.0 adds `/api/status` and can use the server-default Telegram chat.
+
+          ## What was new in 1.1.0
           - **No bot token or chat ID on any phone.** The Telegram token lives only in the relay's server secrets.
           - **6-digit pairing code**: Sender taps "Naya code", the relay mints a code; Receiver types it. One step, no UUIDs to copy.
           - **One-tap Telegram link**: press Start on the bot via the in-app deep link, the relay auto-captures the chat from `/start <code>`.
           - **Real relay polling**: the Receiver worker now actually polls and stores messages (previous build's worker was a stub).
 
           ## APKs
-          - Imista-Forward-Sender-v1.1.0.apk (com.imista.forward.sender) — Setup-only + black forwarding screen
-          - Imista-Forward-Receiver-v1.1.0.apk (com.imista.forward.receiver) — Full dashboard
+          - Imista-Forward-Sender-v1.2.0.apk (com.imista.forward.sender) — Setup-only + black forwarding screen
+          - Imista-Forward-Receiver-v1.2.0.apk (com.imista.forward.receiver) — Full dashboard
 
           ## Architecture
           - TELEGRAM_BOT_KEY (+ optional TELEGRAM_CHAT_ID fallback) kept server-side on the relay (Supabase Edge Function), never in APK.
@@ -413,8 +420,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/Imista-Forward-Sender-v1.1.0.apk
-            artifacts/Imista-Forward-Receiver-v1.1.0.apk
+            artifacts/Imista-Forward-Sender-v1.2.0.apk
+            artifacts/Imista-Forward-Receiver-v1.2.0.apk
             artifacts/SHA256SUMS.txt
           body_path: artifacts/RELEASE_NOTES.md
           generate_release_notes: false

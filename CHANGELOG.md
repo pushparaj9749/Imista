@@ -2,6 +2,24 @@
 
 All notable changes to Imista Forward are documented here.
 
+## [1.2.0] — 2026-11-20
+
+### Sender — true black screen, always in background
+- Black screen is now genuinely black: no gear, no buttons, no navigation. It is the only screen after setup, on every launch.
+- Hidden settings: tap the faint `IMISTA` logo **6 times** to reach status + controls.
+- Live on-screen stats (very dim): battery %, charging, forwarded count, last-forward age, battery-saver warning.
+- `DeviceStatusWorker`: pushes battery, charging, network, screen/lock state, battery saver, free storage, uptime and forwarded total to the relay every 15 min, right after each successful forward, on app open and after reboot.
+- Boot receiver now re-arms forwarding **and** the heartbeat, so forwarding survives reboots without opening the app.
+
+### Receiver — sees the Sender phone
+- Home card + dedicated **Sender Status** screen: battery %, charging, network, forwarding ON/OFF, sent count, storage, uptime, device model, last heartbeat, stale/live indicator.
+- Warning banner when the Sender's notification access or forwarding is off.
+
+### Relay v1.2.0
+- New `POST/GET /api/status` backed by `public.imista_device_status` (RLS on).
+- `/api/link` falls back to the server-default chat when `TELEGRAM_CHAT_ID` is set, so Telegram can be wired fully server-side.
+- `/api/health` now reports `defaultChatConfigured` and version.
+
 ## [1.1.0] — 2026-11-20
 
 ### Changed — token leaves the phones completely
