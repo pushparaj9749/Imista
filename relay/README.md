@@ -65,3 +65,5 @@ TELEGRAM_BOT_KEY=dummy SUPABASE_URL='' vercel dev
 
 ## Health check
 `GET /api/health` returns `{ok:true,...}` for both the Android apps and CI smoke tests.
+
+_Verified via CI smoke test._
