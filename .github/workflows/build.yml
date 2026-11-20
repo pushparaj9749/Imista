@@ -127,22 +127,34 @@ jobs:
         run: |
           echo "=== Searching for APKs ==="
           pwd
-          find . -type f -name "*.apk" | head -n 20
-          ls -R sender/build/outputs 2>&1 | head -n 100
-          ls -R receiver/build/outputs 2>&1 | head -n 100
-          ls sender/build/outputs/apk/release/ 2>&1 | head -n 20
-          ls receiver/build/outputs/apk/release/ 2>&1 | head -n 20
+          echo "--- find all apk ---"
+          find . -type f -name "*.apk" 2>&1 | head -n 50
+          echo "--- sender outputs ---"
+          ls -R sender/build 2>&1 | head -n 100
+          echo "--- receiver outputs ---"
+          ls -R receiver/build 2>&1 | head -n 100
           mkdir -p artifacts
-          # Use most recent APKs
-          SENDER_APK=$(find sender -type f -name "*.apk" | head -n 1)
-          RECEIVER_APK=$(find receiver -type f -name "*.apk" | head -n 1)
+          # Try known release paths first
+          SENDER_APK=$(ls sender/build/outputs/apk/release/*.apk 2>/dev/null | head -n 1)
+          RECEIVER_APK=$(ls receiver/build/outputs/apk/release/*.apk 2>/dev/null | head -n 1)
+          if [ -z "$SENDER_APK" ]; then SENDER_APK=$(find sender -type f -name "*.apk" 2>/dev/null | head -n 1); fi
+          if [ -z "$RECEIVER_APK" ]; then RECEIVER_APK=$(find receiver -type f -name "*.apk" 2>/dev/null | head -n 1); fi
           echo "Sender APK: $SENDER_APK"
           echo "Receiver APK: $RECEIVER_APK"
-          if [ -z "$SENDER_APK" ]; then echo "Sender APK not found — listing all"; find . -type f | grep -i apk | head -n 20; exit 1; fi
-          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; find . -type f | grep -i apk | head -n 20; exit 1; fi
+          if [ -z "$SENDER_APK" ]; then
+            echo "Sender APK not found — checking fallback debug"
+            SENDER_APK=$(ls sender/build/outputs/apk/debug/*.apk 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$RECEIVER_APK" ]; then
+            RECEIVER_APK=$(ls receiver/build/outputs/apk/debug/*.apk 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$SENDER_APK" ]; then echo "Sender APK still not found"; find . -type f 2>&1 | grep -i apk | head -n 20; ls -lh sender/build/outputs/apk/ 2>&1 | head -n 20; exit 1; fi
+          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; find . -type f 2>&1 | grep -i apk | head -n 20; exit 1; fi
           cp "$SENDER_APK" artifacts/Imista-Forward-Sender-v1.0.0.apk
           cp "$RECEIVER_APK" artifacts/Imista-Forward-Receiver-v1.0.0.apk
+          echo "=== Artifacts ==="
           ls -lh artifacts/
+          ls -lh "$SENDER_APK" "$RECEIVER_APK"
 
       - name: Generate SHA256 checksums
         if: always()
