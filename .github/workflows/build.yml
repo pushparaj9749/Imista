@@ -95,15 +95,17 @@ jobs:
 
       - name: Build Receiver Release APK (relay mode)
         id: build_receiver
-        if: always()
         run: |
           echo "=== Building Receiver ==="
+          set -o pipefail
           gradle :receiver:assembleRelease --stacktrace --info 2>&1 | tee /tmp/receiver-build.log
-          cat /tmp/receiver-build.log | tail -n 300
+          EXIT=${PIPESTATUS[0]}
+          echo "Receiver build exit code: $EXIT"
+          cat /tmp/receiver-build.log | tail -n 500
           echo "=== Receiver outputs ==="
           find . -maxdepth 4 -name "*.apk" -o -name "*.aab" | head -n 20
-          ls -lh receiver/build/outputs/ 2>&1 | head -n 50 || echo "no receiver/build/outputs"
-          find receiver -type f | head -n 50
+          ls -lh receiver/build/outputs/ 2>&1 | head -n 100 || echo "no receiver/build/outputs"
+          exit $EXIT
 
       - name: Upload Receiver build log on failure
         if: failure() && steps.build_receiver.outcome == 'failure'
