@@ -7,26 +7,53 @@ on:
       - 'relay/**'
       - '.github/workflows/relay-check.yml'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   check:
     name: Probe relay endpoints
     runs-on: ubuntu-latest
     steps:
       - name: Probe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -u
+          OUT=/tmp/report.md
+          echo "### Relay probe $(date -u +%FT%TZ)" > "$OUT"
+          echo "" >> "$OUT"
           probe() {
             U="$1"
             echo "########## $U"
             CODE=$(curl -sS -L --max-time 30 -o /tmp/b -w '%{http_code}' "$U" 2>/tmp/err || echo "000")
+            BODY=$(head -c 300 /tmp/b 2>/dev/null | tr '\n' ' ')
+            ERR=$(head -c 120 /tmp/err 2>/dev/null | tr '\n' ' ')
             echo "HTTP $CODE"
-            echo "----- body -----"
-            head -c 500 /tmp/b 2>/dev/null || true
-            echo
-            echo "----- err -----"
-            head -c 300 /tmp/err 2>/dev/null || true
-            echo "::warning title=relayprobe::$U $CODE $(head -c 200 /tmp/b 2>/dev/null | tr "\n" " ")"
+            echo "BODY $BODY"
+            echo "ERR  $ERR"
+            {
+              echo "- \`$U\` → HTTP **$CODE**"
+              echo '  ```'
+              echo "  $BODY"
+              echo "  $ERR"
+              echo '  ```'
+            } >> "$OUT"
           }
           probe "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health"
           probe "https://imista-relay.vercel.app/api/health"
           probe "https://wsta.vercel.app/"
+
+          echo "----- report -----"
+          cat "$OUT"
+
+          # Publish the report to a tracking issue so results are readable from outside Actions.
+          ISSUE=$(gh api "repos/$REPO/issues?labels=relay-probe&state=open" --jq '.[0].number' 2>/dev/null || true)
+          if [ -z "$ISSUE" ] || [ "$ISSUE" = "null" ]; then
+            gh api "repos/$REPO/labels" -f name=relay-probe -f color=0e8a16 >/dev/null 2>&1 || true
+            ISSUE=$(gh api "repos/$REPO/issues" -f title="Relay probe report" -f body="Automated relay reachability reports are posted here." -f labels[]=relay-probe --jq '.number')
+          fi
+          gh api "repos/$REPO/issues/$ISSUE/comments" -f body="$(cat "$OUT")" >/dev/null
+          echo "Posted report to issue #$ISSUE"
