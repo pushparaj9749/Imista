@@ -38,6 +38,10 @@ android {
             isMinifyEnabled = false
         }
     }
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

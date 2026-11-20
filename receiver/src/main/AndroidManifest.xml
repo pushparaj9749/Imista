@@ -44,11 +44,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".service.PollingService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
