@@ -185,7 +185,7 @@ adb install Imista-Forward-Receiver-v1.0.0.apk
 # Check package names differ, permissions correct, launch ok
 ```
 
-**CI:** `.github/workflows/build.yml` installs SDK 35, builds both APKs, renames, generates `SHA256SUMS.txt`, uploads artifacts, and on tag `v*` creates **GitHub Release** `v1.0.0` with APKs attached.
+**CI:** `.github/workflows/build.yml` installs SDK 35, builds both APKs, renames, generates `SHA256SUMS.txt`, uploads artifacts, and on tag `v*` creates **GitHub Release** `v1.1.0` with APKs attached.
 
 If `TELEGRAM_BOT_KEY` secret is configured, workflow validates format (without leaking value); otherwise warns and skips live Telegram test — manual verification required.
 
@@ -234,7 +234,9 @@ Implemented via `DeviceAdminReceiver` + `DevicePolicyManager` official APIs:
 
 ### Relay endpoint
 - Health: `https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health`
-- Routes: `api/register`, `api/forward`, `api/poll`
+- Bot info: `.../api/bot` → `{"telegramConfigured":…,"username":…}`
+- Routes: `api/register` (mints/joins a 6-digit code), `api/link` (auto-captures the Telegram chat from `/start <code>`), `api/forward`, `api/poll`
+- One-time server setup (never on a phone): set `TELEGRAM_BOT_KEY` as a Supabase function secret, then redeploy. `TELEGRAM_CHAT_ID` stays optional as a global fallback chat.
 - The URL is baked into the APK via `RELAY_URL` (build-time env / Gradle property) and can be overridden at runtime in the app's settings.
 
 ---
