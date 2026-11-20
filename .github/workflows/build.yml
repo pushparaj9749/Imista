@@ -80,11 +80,13 @@ jobs:
         id: build_sender
         run: |
           echo "=== Building Sender ==="
+          set -o pipefail
           gradle :sender:assembleRelease --stacktrace --info 2>&1 | tee /tmp/sender-build.log
-          echo "Sender build exit code: $?"
-          cat /tmp/sender-build.log | tail -n 200
-          # Fail if APK not found
+          EXIT=${PIPESTATUS[0]}
+          echo "Sender build exit code: $EXIT"
+          cat /tmp/sender-build.log | tail -n 300
           ls sender/build/outputs/apk/release/*.apk 2>&1 | head -n 20
+          exit $EXIT
 
       - name: Upload Sender build log on failure
         if: failure() && steps.build_sender.outcome == 'failure'
@@ -107,30 +109,23 @@ jobs:
           ls -lh receiver/build/outputs/ 2>&1 | head -n 100 || echo "no receiver/build/outputs"
           exit $EXIT
 
-      - name: Post Receiver build log as commit comment on failure
+      - name: Upload Receiver build log to Gist on failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Posting build log to commit comment for debugging (api.github.com allowed)..."
+          echo "Uploading receiver build log to Gist for debugging..."
           if [ -f /tmp/receiver-build.log ]; then
+            gh gist create --public --filename receiver-build.log /tmp/receiver-build.log || echo "gist failed"
             echo "=== Receiver log tail ==="
-            tail -n 600 /tmp/receiver-build.log | head -n 80
-            # Prepare payload (escape)
-            LOG_TAIL=$(tail -n 100 /tmp/receiver-build.log | head -n 80 | jq -Rs .)
-            SHA=$(git rev-parse HEAD)
-            # Post comment to commit
-            curl -s -X POST -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json"               https://api.github.com/repos/pushparaj9749/Imista/commits/$SHA/comments               -d "{\"body\": \"**Receiver build log tail (last 100 lines):**\\n\\n\\\`\\\`\\\`\\n$(tail -n 80 /tmp/receiver-build.log | sed 's/"/\\"/g' | tr -d '\r' | head -c 5000)\\n\\\`\\\`\\\`\"}" || true
+            tail -n 300 /tmp/receiver-build.log
           fi
           if [ -f /tmp/sender-build.log ]; then
-            echo "=== Sender log tail (for reference) ==="
-            tail -n 50 /tmp/sender-build.log
+            echo "=== Sender log tail ==="
+            tail -n 100 /tmp/sender-build.log
           fi
-          # Also dump sender/receiver outputs for debugging
-          echo "=== Sender outputs ==="
-          cat /tmp/sender-build.log | grep -i "error" | head -n 50 || true
-          echo "=== Receiver outputs ==="
-          cat /tmp/receiver-build.log | grep -i "error" | head -n 100 || true
+          # Also try sender log gist
+          if [ -f /tmp/sender-build.log ]; then gh gist create --public --filename sender-build.log /tmp/sender-build.log || true; fi
 
       - name: Verify no token embedded
         if: always()
