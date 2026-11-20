@@ -2,6 +2,11 @@
 
 Keeps `TELEGRAM_BOT_KEY` server-side, never in APK.
 
+## Live deployments
+- Production alias: https://imista-relay.vercel.app/api/health
+- Project: `imista-relay` (Vercel project `prj_TxAYoAwObIZgsJgGVt0ijlsFCOkm`, root directory `relay`, framework preset `node`)
+- The APK only ever knows `RELAY_URL` — no bot token is embedded.
+
 ## Endpoints
 - `POST /api/register` {pairingId, deviceId, deviceName, role} → creates/links pairing
 - `GET /api/register?pairingId=` → checks status, auto-discovers chatId via bot polling for `/start pairingId`
@@ -57,3 +62,6 @@ cd relay
 npm install
 TELEGRAM_BOT_KEY=dummy SUPABASE_URL='' vercel dev
 ```
+
+## Health check
+`GET /api/health` returns `{ok:true,...}` for both the Android apps and CI smoke tests.
