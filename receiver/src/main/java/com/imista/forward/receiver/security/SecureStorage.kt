@@ -2,6 +2,7 @@ package com.imista.forward.receiver.security
 
 import android.content.Context
 import android.provider.Settings
+import com.imista.forward.receiver.BuildConfig
 import com.imista.forward.shared.security.CryptoManager
 import com.imista.forward.shared.util.Constants
 import java.util.UUID
