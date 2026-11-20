@@ -35,15 +35,15 @@ class SecureStorage(context: Context) {
 
     var deviceId: String
         get() {
-            var id = prefs.getString("device_id", null)
+            var id: String? = prefs.getString("device_id", null)
             if (id.isNullOrBlank()) {
                 id = try {
                     Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID) ?: UUID.randomUUID().toString()
                 } catch (e: Exception) { UUID.randomUUID().toString() }
-                if (id.length < 10) id = UUID.randomUUID().toString()
+                if ((id?.length ?: 0) < 10) id = UUID.randomUUID().toString()
                 prefs.edit().putString("device_id", id).apply()
             }
-            return id
+            return id ?: UUID.randomUUID().toString()
         }
         set(v) { prefs.edit().putString("device_id", v).apply() }
 
