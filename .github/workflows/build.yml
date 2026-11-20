@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  RELAY_URL_DEFAULT: "https://imista-relay.vercel.app"
+  RELAY_URL_DEFAULT: "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay"
 
 jobs:
   test:
@@ -19,7 +19,7 @@ jobs:
       contents: write
       issues: write
     env:
-      RELAY_URL: ${{ secrets.RELAY_URL || 'https://imista-relay.vercel.app' }}
+      RELAY_URL: ${{ secrets.RELAY_URL || 'https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,12 +74,11 @@ jobs:
 
       - name: Probe relay health (non-blocking)
         run: |
-          for U in "https://imista-relay.vercel.app/api/health" "https://imista-relay-wsta.vercel.app/api/health"; do
-            echo "=== $U"
-            curl -sS -L --max-time 25 -o /tmp/relay.txt -w 'HTTP %{http_code}\n' "$U" || echo "curl failed"
-            head -c 400 /tmp/relay.txt || true
-            echo
-          done
+          U="${RELAY_URL:-$RELAY_URL_DEFAULT}/api/health"
+          echo "=== $U"
+          curl -sS -L --max-time 25 -o /tmp/relay.txt -w 'HTTP %{http_code}\n' "$U" || echo "curl failed"
+          head -c 400 /tmp/relay.txt || true
+          if grep -q '"ok":true' /tmp/relay.txt 2>/dev/null; then echo "Relay healthy"; else echo "::warning::Relay health check did not return ok:true"; fi
         continue-on-error: true
 
       - name: Run unit tests (shared) - continue on error
@@ -337,7 +336,7 @@ jobs:
 
           ## Architecture
           - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on relay (Vercel), never in APK.
-          - Relay: https://imista-relay.vercel.app — /api/register, /api/forward, /api/poll, /api/health
+          - Relay: https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay — /api/register, /api/forward, /api/poll, /api/health
           - Sender: Setup-only → Black screen (IMISTA FORWARD + indicator + gear) — background via NotificationListenerService + WorkManager
           - Receiver: Full UI via relay polling (single source)
 

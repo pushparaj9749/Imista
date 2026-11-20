@@ -20,7 +20,7 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        val relayUrlEnv = System.getenv("RELAY_URL") ?: project.findProperty("RELAY_URL") as? String ?: "https://imista-relay.vercel.app"
+        val relayUrlEnv = System.getenv("RELAY_URL") ?: project.findProperty("RELAY_URL") as? String ?: "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay"
         buildConfigField("String", "RELAY_URL", "\"$relayUrlEnv\"")
         buildConfigField("String", "RELAY_VERSION", "\"1.0.0\"")
     }

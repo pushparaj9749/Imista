@@ -20,9 +20,10 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        // Relay URL is injected via CI from secret RELAY_URL or defaults to placeholder
-        // Token never embedded; relay holds TELEGRAM_BOT_KEY server-side
-        buildConfigField("String", "RELAY_URL", "\"https://imista-relay.vercel.app\"")
+        // Relay URL is injected via CI (RELAY_URL env / -PRELAY_URL) or falls back to the public relay.
+        // Token never embedded; the relay holds TELEGRAM_BOT_KEY server-side.
+        val relayUrlEnv = System.getenv("RELAY_URL") ?: (project.findProperty("RELAY_URL") as? String) ?: "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay"
+        buildConfigField("String", "RELAY_URL", "\"$relayUrlEnv\"")
         buildConfigField("String", "RELAY_VERSION", "\"1.0.0\"")
     }
 
