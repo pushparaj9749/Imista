@@ -72,6 +72,16 @@ jobs:
             if echo "$TELEGRAM_CHAT_ID" | grep -Eq '^-?[0-9]+$'; then echo "Chat ID valid."; else echo "::warning::Chat ID invalid"; fi
           fi
 
+      - name: Probe relay health (non-blocking)
+        run: |
+          for U in "https://imista-relay.vercel.app/api/health" "https://imista-relay-wsta.vercel.app/api/health"; do
+            echo "=== $U"
+            curl -sS -L --max-time 25 -o /tmp/relay.txt -w 'HTTP %{http_code}\n' "$U" || echo "curl failed"
+            head -c 400 /tmp/relay.txt || true
+            echo
+          done
+        continue-on-error: true
+
       - name: Run unit tests (shared) - continue on error
         run: |
           echo "=== Shared tests ==="
