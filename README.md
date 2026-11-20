@@ -223,7 +223,12 @@ Implemented via `DeviceAdminReceiver` + `DevicePolicyManager` official APIs:
 - Only one `getUpdates` consumer allowed — we honor that; Sender never polls.
 - Duplicate window 7s (configurable conceptually, fixed for v1).
 - No SMS/call interception beyond notifications — respects visibility restrictions.
-- Bot token must belong to user — we don't provide hosted relay.
+- A small relay endpoint is bundled (Supabase Edge Function `imista-relay`) so the bot token never ships in the APK. Set `TELEGRAM_BOT_KEY` + `TELEGRAM_CHAT_ID` as function secrets for live Telegram delivery; without them messages still flow Sender → relay → Receiver over polling.
+
+### Relay endpoint
+- Health: `https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health`
+- Routes: `api/register`, `api/forward`, `api/poll`
+- The URL is baked into the APK via `RELAY_URL` (build-time env / Gradle property) and can be overridden at runtime in the app's settings.
 
 ---
 
