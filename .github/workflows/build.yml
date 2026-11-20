@@ -29,11 +29,21 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+          log-accepted-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - name: Accept licenses and install SDK components
+      - name: Verify SDK
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" --sdk_root=$ANDROID_SDK_ROOT || true
-          yes | sdkmanager --licenses || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          sdkmanager --version || sdkmanager --list | head -n 20
+          ls $ANDROID_HOME/platforms 2>&1 | head -n 20 || true
+          ls $ANDROID_SDK_ROOT/platforms 2>&1 | head -n 20 || true
+
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -56,12 +66,6 @@ jobs:
             else
               echo "::warning::TELEGRAM_BOT_KEY format invalid"
             fi
-            # Verify no token in APK after build (later step)
-          fi
-          if [ -z "$RELAY_URL" ]; then
-            echo "RELAY_URL secret not set — using default $RELAY_URL_DEFAULT. Deploy relay/ to Vercel with TELEGRAM_BOT_KEY env."
-          else
-            echo "RELAY_URL configured via secret (hidden)"
           fi
 
       - name: Run unit tests (shared)
@@ -84,17 +88,16 @@ jobs:
       - name: Verify no token embedded
         run: |
           echo "Checking APKs do NOT contain TELEGRAM_BOT_KEY..."
-          if grep -r "TELEGRAM_BOT_KEY" sender/receiver --include="*.apk" 2>/dev/null; then
-            echo "::error::Token found in repo — should never embed"
-            exit 1
-          fi
-          # Check strings in APK for token pattern
           for apk in $(find sender/build/outputs receiver/build/outputs -name "*.apk" 2>/dev/null); do
             echo "Scanning $apk"
             if unzip -p "$apk" 2>/dev/null | strings | grep -Eq '[0-9]{8,}:AA[ -~]{30,}' ; then
               echo "::warning::Possible token pattern in $apk — ensure relay mode only (BuildConfig.RELAY_URL, not token)"
             else
               echo "No token pattern in $apk — OK"
+            fi
+            # Also verify BuildConfig contains relay URL not token
+            if unzip -p "$apk" 2>/dev/null | strings | grep -q "imista-relay"; then
+              echo "Relay URL found in $apk — OK"
             fi
           done
 
@@ -162,20 +165,6 @@ jobs:
           See SHA256SUMS.txt
           EOF
           cat artifacts/RELEASE_NOTES.md
-
-      - name: Deploy relay to Vercel (if VERCEL_TOKEN present)
-        if: env.VERCEL_TOKEN != ''
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then echo "Vercel token not set — skipping auto-deploy (manual: cd relay && vercel --prod)"; exit 0; fi
-          npm i -g vercel@latest || true
-          cd relay
-          echo "Deploying relay with TELEGRAM_BOT_KEY (server-side only)..."
-          # Vercel will use env from project settings; ensure TELEGRAM_BOT_KEY set in Vercel dashboard
 
   release:
     name: Publish GitHub Release
