@@ -99,8 +99,11 @@ jobs:
         run: |
           echo "=== Building Receiver ==="
           gradle :receiver:assembleRelease --stacktrace --info 2>&1 | tee /tmp/receiver-build.log
-          cat /tmp/receiver-build.log | tail -n 200
-          ls receiver/build/outputs/apk/release/*.apk 2>&1 | head -n 20
+          cat /tmp/receiver-build.log | tail -n 300
+          echo "=== Receiver outputs ==="
+          find . -maxdepth 4 -name "*.apk" -o -name "*.aab" | head -n 20
+          ls -lh receiver/build/outputs/ 2>&1 | head -n 50 || echo "no receiver/build/outputs"
+          find receiver -type f | head -n 50
 
       - name: Upload Receiver build log on failure
         if: failure() && steps.build_receiver.outcome == 'failure'
