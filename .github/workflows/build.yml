@@ -54,6 +54,7 @@ jobs:
       - name: Check Telegram & Relay secrets (no leak)
         env:
           TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RELAY_URL: ${{ secrets.RELAY_URL }}
         run: |
           echo "Relay URL: ${RELAY_URL:-$RELAY_URL_DEFAULT} (token never embedded in APK)"
@@ -66,6 +67,21 @@ jobs:
             else
               echo "::warning::TELEGRAM_BOT_KEY format invalid"
             fi
+          fi
+          if [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::notice::TELEGRAM_CHAT_ID secret not set — relay will auto-discover chat via bot polling (user must message bot with pairingId) or use fallback. Recommended to set it for automatic configuration."
+          else
+            echo "TELEGRAM_CHAT_ID is configured (length ${#TELEGRAM_CHAT_ID}) — will be used as default chat for relay server-side."
+            if echo "$TELEGRAM_CHAT_ID" | grep -Eq '^-?[0-9]+$'; then
+              echo "Chat ID format valid."
+            else
+              echo "::warning::TELEGRAM_CHAT_ID format invalid — expected numeric like 123456789"
+            fi
+          fi
+          if [ -z "$RELAY_URL" ]; then
+            echo "RELAY_URL secret not set — using default $RELAY_URL_DEFAULT. Deploy relay/ to Vercel with TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID env."
+          else
+            echo "RELAY_URL configured via secret (hidden)"
           fi
 
       - name: Run unit tests (shared)
@@ -95,7 +111,6 @@ jobs:
             else
               echo "No token pattern in $apk — OK"
             fi
-            # Also verify BuildConfig contains relay URL not token
             if unzip -p "$apk" 2>/dev/null | strings | grep -q "imista-relay"; then
               echo "Relay URL found in $apk — OK"
             fi
@@ -141,13 +156,13 @@ jobs:
           - Imista-Forward-Receiver-v1.0.0.apk (com.imista.forward.receiver) — Full dashboard
 
           ## Architecture
-          - TELEGRAM_BOT_KEY kept server-side on relay (Vercel), never in APK. CI retrieves secret during relay deploy, not app build.
+          - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on relay (Vercel), never in APK. CI retrieves secrets during relay deploy, not app build.
           - Relay: https://imista-relay.vercel.app (or your RELAY_URL secret) — endpoints /api/register, /api/forward, /api/poll, /api/health
           - Sender: Setup-only (Notification Access, Device Admin optional, Pairing, Verify, Start Forwarding) → Black screen with IMISTA FORWARD label + subtle forwarding indicator + gear settings. Background via NotificationListenerService + WorkManager (no fake permanent alive claim).
           - Receiver: Full UI (Dashboard, Feed, Filters, Search, History, Connection, Privacy, About) via relay polling (single source, no competing getUpdates consumers).
 
           ## Installation
-          1. Deploy relay/ to Vercel: set env TELEGRAM_BOT_KEY (from GitHub Secret), optionally SUPABASE_URL/KEY, TELEGRAM_CHAT_ID.
+          1. Deploy relay/ to Vercel: set env TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID (both from GitHub Secrets), optionally SUPABASE_URL/KEY.
           2. Install Sender on secondary phone, Receiver on primary.
           3. Open Sender → generate Pairing ID → Register → share same ID to Receiver → Register → Verify.
           4. Grant Notification Access on Sender (and Receiver optional for mirror).
