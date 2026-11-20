@@ -20,6 +20,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        // Relay URL is injected via CI from secret RELAY_URL or defaults to placeholder
+        // Token never embedded; relay holds TELEGRAM_BOT_KEY server-side
+        val relayUrlEnv = System.getenv("RELAY_URL") ?: project.findProperty("RELAY_URL") as? String ?: "https://imista-relay.vercel.app"
+        buildConfigField("String", "RELAY_URL", "\"$relayUrlEnv\"")
+        buildConfigField("String", "RELAY_VERSION", "\"1.0.0\"")
     }
 
     buildTypes {
@@ -45,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"

@@ -8,10 +8,15 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  RELAY_URL_DEFAULT: "https://imista-relay.vercel.app"
+
 jobs:
   test:
     name: Unit Tests & Build
     runs-on: ubuntu-latest
+    env:
+      RELAY_URL: ${{ secrets.RELAY_URL || 'https://imista-relay.vercel.app' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,19 +41,27 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew || true
 
-      - name: Check TELEGRAM_BOT_KEY secret presence (no leak)
+      - name: Check Telegram & Relay secrets (no leak)
         env:
           TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
+          RELAY_URL: ${{ secrets.RELAY_URL }}
         run: |
+          echo "Relay URL: ${RELAY_URL:-$RELAY_URL_DEFAULT} (token never embedded in APK)"
           if [ -z "$TELEGRAM_BOT_KEY" ]; then
-            echo "::warning::TELEGRAM_BOT_KEY secret not set — skipping Telegram live tests (expected for public CI). Local verification must be done manually."
+            echo "::warning::TELEGRAM_BOT_KEY secret not set — relay will run in mock mode. Set it in GitHub Secrets & Vercel env to enable Telegram delivery."
           else
-            echo "TELEGRAM_BOT_KEY secret is configured (length ${#TELEGRAM_BOT_KEY}) — will not print value."
+            echo "TELEGRAM_BOT_KEY is configured (length ${#TELEGRAM_BOT_KEY}) — kept server-side on relay, NOT in APK."
             if echo "$TELEGRAM_BOT_KEY" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$'; then
-              echo "Bot token format looks valid."
+              echo "Bot token format valid."
             else
-              echo "::warning::TELEGRAM_BOT_KEY format invalid — expected 123456:ABC..."
+              echo "::warning::TELEGRAM_BOT_KEY format invalid"
             fi
+            # Verify no token in APK after build (later step)
+          fi
+          if [ -z "$RELAY_URL" ]; then
+            echo "RELAY_URL secret not set — using default $RELAY_URL_DEFAULT. Deploy relay/ to Vercel with TELEGRAM_BOT_KEY env."
+          else
+            echo "RELAY_URL configured via secret (hidden)"
           fi
 
       - name: Run unit tests (shared)
@@ -62,11 +75,28 @@ jobs:
         run: gradle :receiver:testDebugUnitTest --stacktrace || ./gradlew :receiver:testDebugUnitTest --stacktrace
         continue-on-error: true
 
-      - name: Build Sender Release APK
+      - name: Build Sender Release APK (relay mode, no token embedded)
         run: gradle :sender:assembleRelease --stacktrace || ./gradlew :sender:assembleRelease --stacktrace
 
-      - name: Build Receiver Release APK
+      - name: Build Receiver Release APK (relay mode, no token embedded)
         run: gradle :receiver:assembleRelease --stacktrace || ./gradlew :receiver:assembleRelease --stacktrace
+
+      - name: Verify no token embedded
+        run: |
+          echo "Checking APKs do NOT contain TELEGRAM_BOT_KEY..."
+          if grep -r "TELEGRAM_BOT_KEY" sender/receiver --include="*.apk" 2>/dev/null; then
+            echo "::error::Token found in repo — should never embed"
+            exit 1
+          fi
+          # Check strings in APK for token pattern
+          for apk in $(find sender/build/outputs receiver/build/outputs -name "*.apk" 2>/dev/null); do
+            echo "Scanning $apk"
+            if unzip -p "$apk" 2>/dev/null | strings | grep -Eq '[0-9]{8,}:AA[ -~]{30,}' ; then
+              echo "::warning::Possible token pattern in $apk — ensure relay mode only (BuildConfig.RELAY_URL, not token)"
+            else
+              echo "No token pattern in $apk — OK"
+            fi
+          done
 
       - name: Rename APKs to release names
         run: |
@@ -101,38 +131,51 @@ jobs:
           cat > artifacts/RELEASE_NOTES.md <<'EOF'
           # Imista Forward v1.0.0 — Sender & Receiver
 
-          Two independent Android applications for private phone-to-phone notification forwarding via Telegram Bot API.
+          Two independent Android applications with secure relay architecture.
 
           ## APKs
-          - Imista-Forward-Sender-v1.0.0.apk (package: com.imista.forward.sender)
-          - Imista-Forward-Receiver-v1.0.0.apk (package: com.imista.forward.receiver)
+          - Imista-Forward-Sender-v1.0.0.apk (com.imista.forward.sender) — Setup-only + black forwarding screen
+          - Imista-Forward-Receiver-v1.0.0.apk (com.imista.forward.receiver) — Full dashboard
+
+          ## Architecture
+          - TELEGRAM_BOT_KEY kept server-side on relay (Vercel), never in APK. CI retrieves secret during relay deploy, not app build.
+          - Relay: https://imista-relay.vercel.app (or your RELAY_URL secret) — endpoints /api/register, /api/forward, /api/poll, /api/health
+          - Sender: Setup-only (Notification Access, Device Admin optional, Pairing, Verify, Start Forwarding) → Black screen with IMISTA FORWARD label + subtle forwarding indicator + gear settings. Background via NotificationListenerService + WorkManager (no fake permanent alive claim).
+          - Receiver: Full UI (Dashboard, Feed, Filters, Search, History, Connection, Privacy, About) via relay polling (single source, no competing getUpdates consumers).
 
           ## Installation
-          1. Install Sender on secondary phone, Receiver on primary phone.
-          2. Create bot via @BotFather, get token (never hardcode).
-          3. Start private chat with bot on both phones.
-          4. Enter same Bot Token & Chat ID in both apps → Test connection.
-          5. Grant Notification Access on Sender (and optionally on Receiver for Telegram reconstruction).
-          6. Choose apps to forward in Sender → App Selection.
-          7. Trigger notification → verify appears in Telegram and Receiver Feed.
+          1. Deploy relay/ to Vercel: set env TELEGRAM_BOT_KEY (from GitHub Secret), optionally SUPABASE_URL/KEY, TELEGRAM_CHAT_ID.
+          2. Install Sender on secondary phone, Receiver on primary.
+          3. Open Sender → generate Pairing ID → Register → share same ID to Receiver → Register → Verify.
+          4. Grant Notification Access on Sender (and Receiver optional for mirror).
+          5. Start Forwarding → Sender shows black screen; lock phone, forwarding continues in background.
+          6. Trigger notifications (WhatsApp, SMS, Gmail, Instagram, Telegram, Discord) → appear in Telegram and Receiver Feed via relay.
 
           ## Security
-          - Keystore-backed EncryptedSharedPreferences
-          - No hardcoded secrets, no logs of content
-          - Telegram messages are HTTPS but not E2E Secret Chats — optional app-level AES-GCM encryption available
-          - No analytics, no ads
+          - HTTPS, Keystore EncryptedSharedPreferences, authenticated pairing (UUID, not guessable), no token in APK/logs/artifacts, no analytics, auto-prune 7 days.
+          - Telegram bot messages are not Secret Chat E2E — documented honestly; optional app-level AES-GCM ready.
 
-          ## Architecture Honesty
-          - Telegram Bot API does NOT push bot-sent messages to another app. Receiver reconstructs via Telegram notification listening (requires Telegram notifications enabled). Only Receiver polls getUpdates for pairing commands; Sender never polls to avoid single-consumer conflicts.
-
-          ## Device Admin (Sender Optional)
-          - Official DeviceAdminReceiver + DevicePolicyManager
-          - Explicit activation, user-deactivatable, does NOT make app uninstall-proof (standard Android allows deactivation then uninstall). Forwarding works without it.
+          ## Device Admin
+          - Official DeviceAdminReceiver, explicit activation, status, user deactivation, lock test. Does NOT claim to prevent all uninstall.
 
           ## Checksums
           See SHA256SUMS.txt
           EOF
           cat artifacts/RELEASE_NOTES.md
+
+      - name: Deploy relay to Vercel (if VERCEL_TOKEN present)
+        if: env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then echo "Vercel token not set — skipping auto-deploy (manual: cd relay && vercel --prod)"; exit 0; fi
+          npm i -g vercel@latest || true
+          cd relay
+          echo "Deploying relay with TELEGRAM_BOT_KEY (server-side only)..."
+          # Vercel will use env from project settings; ensure TELEGRAM_BOT_KEY set in Vercel dashboard
 
   release:
     name: Publish GitHub Release

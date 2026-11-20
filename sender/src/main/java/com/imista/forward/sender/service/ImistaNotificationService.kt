@@ -53,6 +53,9 @@ class ImistaNotificationService : NotificationListenerService() {
     private suspend fun handleNotification(sbn: StatusBarNotification) {
         val context = applicationContext
         val secure = SecureStorage(context)
+        // Black-screen mode: forwardingActive controls actual forwarding, UI is just black screen
+        if (!secure.forwardingActive) return
+        if (!secure.isConfigured()) return
         val db = AppDatabase.get(context)
 
         // Parse

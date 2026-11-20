@@ -20,6 +20,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        val relayUrlEnv = System.getenv("RELAY_URL") ?: project.findProperty("RELAY_URL") as? String ?: "https://imista-relay.vercel.app"
+        buildConfigField("String", "RELAY_URL", "\"$relayUrlEnv\"")
+        buildConfigField("String", "RELAY_VERSION", "\"1.0.0\"")
     }
 
     buildTypes {
@@ -45,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"

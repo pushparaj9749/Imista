@@ -19,6 +19,8 @@ import com.imista.forward.receiver.ui.theme.ImistaReceiverTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Schedule relay polling
+        try { com.imista.forward.receiver.service.RelayPollingService.schedulePeriodic(applicationContext) } catch (_: Exception) {}
         setContent {
             ImistaReceiverTheme {
                 Surface(Modifier.fillMaxSize(), color = Color(0xFF0B0B14)) { ReceiverNav() }
@@ -35,14 +37,15 @@ fun ReceiverNav() {
         NavigationBar(containerColor = Color(0xFF151521)) {
             NavigationBarItem(selected = selected=="home", onClick={selected="home"; nav.navigate("home")}, icon={Icon(Icons.Default.Home, null)}, label={Text("Home")})
             NavigationBarItem(selected = selected=="feed", onClick={selected="feed"; nav.navigate("feed")}, icon={Icon(Icons.Default.Inbox, null)}, label={Text("Feed")})
-            NavigationBarItem(selected = selected=="connection", onClick={selected="connection"; nav.navigate("connection")}, icon={Icon(Icons.Default.Link, null)}, label={Text("Connect")})
+            NavigationBarItem(selected = selected=="pairing", onClick={selected="pairing"; nav.navigate("pairing")}, icon={Icon(Icons.Default.Link, null)}, label={Text("Pairing")})
             NavigationBarItem(selected = selected=="about", onClick={selected=="about"; nav.navigate("about")}, icon={Icon(Icons.Default.Info, null)}, label={Text("About")})
         }
     }) { padding ->
         Box(Modifier.padding(padding)) {
             NavHost(navController=nav, startDestination="home") {
                 composable("home") { HomeScreen(onNavigate={ nav.navigate(it) }) }
-                composable("connection") { ConnectionScreen() }
+                composable("connection") { ConnectionScreen() } // legacy kept for fallback
+                composable("pairing") { SetupReceiverScreen() }
                 composable("feed") { FeedScreen() }
                 composable("filters") { FiltersScreen() }
                 composable("privacy") { PrivacyReceiverScreen() }
