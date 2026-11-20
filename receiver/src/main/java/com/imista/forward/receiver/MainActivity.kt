@@ -106,6 +106,7 @@ fun ReceiverNav() {
                 composable("connection") { ConnectionScreen() }
                 composable("pairing") { SetupReceiverScreen() }
                 composable("feed") { FeedScreen() }
+                composable("sender_status") { com.imista.forward.receiver.ui.screens.SenderStatusScreen(onBack = { nav.popBackStack() }) }
                 composable("filters") { FiltersScreen() }
                 composable("privacy") { PrivacyReceiverScreen() }
                 composable("history") { HistoryReceiverScreen() }

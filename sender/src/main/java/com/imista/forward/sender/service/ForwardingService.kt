@@ -88,6 +88,13 @@ class ForwardWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
                 )
             )
             secure.lastDelivery = System.currentTimeMillis()
+            secure.bumpForwarded()
+            applicationContext.getSharedPreferences("imista_status", Context.MODE_PRIVATE).edit()
+                .putLong("last_forward", System.currentTimeMillis())
+                .putInt("total_forwarded", secure.totalForwarded)
+                .apply()
+            // Fresh battery/network snapshot right after a successful forward.
+            DeviceStatusWorker.enqueueNow(applicationContext)
             Result.success()
         } else {
             val retryAfter = result.retryAfterSeconds

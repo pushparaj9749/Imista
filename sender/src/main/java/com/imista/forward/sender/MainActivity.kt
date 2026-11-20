@@ -131,7 +131,16 @@ fun SenderRootWithPermissions() {
 @Composable
 fun SenderRoot(secure: SecureStorage, setupVm: SetupViewModel) {
     val nav = rememberNavController()
-    val startDestination = if (secure.onboardingComplete && secure.forwardingActive) "black" else "setup"
+    val context = LocalContext.current
+    // Once set up, every launch lands straight on the black screen (no setup, no gear).
+    val startDestination = if (secure.forwardingActive && secure.onboardingComplete) "black" else "setup"
+
+    LaunchedEffect(startDestination) {
+        if (startDestination == "black") {
+            com.imista.forward.sender.service.DeviceStatusWorker.schedulePeriodic(context)
+            com.imista.forward.sender.service.DeviceStatusWorker.enqueueNow(context)
+        }
+    }
 
     LaunchedEffect(startDestination) {
         setupVm.refresh()

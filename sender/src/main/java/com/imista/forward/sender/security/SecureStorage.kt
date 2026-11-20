@@ -84,6 +84,18 @@ class SecureStorage(context: Context) {
         get() = prefs.getString("device_name", android.os.Build.MODEL ?: "Sender Device") ?: "Sender Device"
         set(value) { prefs.edit().putString("device_name", value).apply() }
 
+    /** Lifetime count of successfully forwarded notifications (shown on the black screen). */
+    var totalForwarded: Int
+        get() = prefs.getInt("total_forwarded", 0)
+        set(value) { prefs.edit().putInt("total_forwarded", value).apply() }
+
+    fun bumpForwarded() = totalForwarded.let { totalForwarded = it + 1 }
+
+    /** Set once the user has seen the first black screen; re-opens never show setup again. */
+    var hideAllUi: Boolean
+        get() = prefs.getBoolean("hide_all_ui", false)
+        set(value) { prefs.edit().putBoolean("hide_all_ui", value).apply() }
+
     fun isConfigured(): Boolean {
         // New mode: pairingId + relayUrl is sufficient; token stored server-side
         if (!pairingId.isNullOrBlank() && relayUrl.isNotBlank()) return true

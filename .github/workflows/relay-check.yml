@@ -82,7 +82,18 @@ jobs:
             -H "X-Pairing-Id: $PAIR" -H "X-Device-Id: intruder" -d '{"payload":{"id":"x","text":"nope"}}')
           log "status=$U body=\`$(cat /tmp/u.txt)\`"
 
+          log "#### Sender pushes device status (battery/network/forwarding)"
+          ST=$(curl -sS -m 30 -X POST "$RELAY/api/status" -H 'Content-Type: application/json' \
+            -H "X-Pairing-Id: $PAIR" -H "X-Device-Id: $SENDER" \
+            -d '{"status":{"batteryPct":64,"charging":true,"network":"wifi","forwarding":true,"notificationAccess":true,"forwardedTotal":12,"storageFreeMb":4200,"uptimeMinutes":90}}')
+          log "\`$ST\`"
+
+          log "#### Receiver reads sender status"
+          GS=$(curl -sS -m 30 "$RELAY/api/status?pairingId=$PAIR&deviceId=$RECEIVER")
+          log "\`$GS\`"
+
           echo "$P" | grep -q "$MSGID" && log "✅ message reached receiver via poll" || log "❌ message NOT found in poll"
+          echo "$GS" | grep -q '"batteryPct":64' && log "✅ sender battery status visible to receiver" || log "❌ sender status missing"
           echo "$R1" | grep -q '"code"' && log "✅ sender got a relay-minted code (no manual token/chat id)" || log "❌ no code minted"
 
       - name: Publish report to tracking issue

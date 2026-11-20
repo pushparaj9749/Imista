@@ -26,6 +26,36 @@ data class LinkResponse(
     val error: String?
 )
 
+data class StatusInfo(
+    val batteryPct: Int? = null,
+    val charging: Boolean? = null,
+    val network: String? = null,
+    val screenOn: Boolean? = null,
+    val screenLocked: Boolean? = null,
+    val batterySaver: Boolean? = null,
+    val forwarding: Boolean = false,
+    val notificationAccess: Boolean = false,
+    val appVersion: String? = null,
+    val deviceModel: String? = null,
+    val storageFreeMb: Int? = null,
+    val uptimeMinutes: Int? = null,
+    val forwardedTotal: Int? = null,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+data class DeviceStatusRequest(
+    val pairingId: String,
+    val deviceId: String,
+    val status: StatusInfo
+)
+
+data class StatusResponse(
+    val ok: Boolean,
+    val status: StatusInfo? = null,
+    val updatedAt: Long? = null,
+    val error: String? = null
+)
+
 data class RelayBotInfo(
     val ok: Boolean,
     val telegramConfigured: Boolean?,
@@ -96,6 +126,15 @@ interface RelayApi {
 
     @GET("api/bot")
     suspend fun bot(): Response<RelayBotInfo>
+
+    @POST("api/status")
+    suspend fun pushStatus(@Body req: DeviceStatusRequest): Response<StatusResponse>
+
+    @GET("api/status")
+    suspend fun getStatus(
+        @Query("pairingId") pairingId: String,
+        @Query("deviceId") deviceId: String
+    ): Response<StatusResponse>
 
     @POST("api/forward")
     suspend fun forward(

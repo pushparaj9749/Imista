@@ -24,7 +24,8 @@ data class SetupState(
     val verificationStatus: String? = null,
     val isVerifying: Boolean = false,
     val canStartForwarding: Boolean = false,
-    val showBlackScreen: Boolean = false
+    val showBlackScreen: Boolean = false,
+    val forwardingActive: Boolean = false
 )
 
 class SetupViewModel(app: Application) : AndroidViewModel(app) {
@@ -34,7 +35,8 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(SetupState(
         pairingId = secure.pairingId ?: "",
         relayUrl = secure.relayUrl,
-        showBlackScreen = secure.onboardingComplete && secure.forwardingActive
+        showBlackScreen = secure.onboardingComplete && secure.forwardingActive,
+        forwardingActive = secure.forwardingActive
     ))
     val state: StateFlow<SetupState> = _state
 
@@ -50,7 +52,8 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
             deviceAdminEnabled = adminEnabled,
             pairingId = pairingId,
             canStartForwarding = canStart,
-            showBlackScreen = secure.onboardingComplete && secure.forwardingActive
+            showBlackScreen = secure.onboardingComplete && secure.forwardingActive,
+            forwardingActive = secure.forwardingActive
         )
     }
 
@@ -177,13 +180,19 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         if (secure.pairingId.isNullOrBlank()) secure.pairingId = _state.value.pairingId
         secure.onboardingComplete = true
         secure.forwardingActive = true
-        _state.value = _state.value.copy(showBlackScreen = true, verificationStatus = "Forwarding active")
+        secure.hideAllUi = true
+        // Keep running with the app closed: heartbeat + status push, both in WorkManager.
+        com.imista.forward.sender.service.DeviceStatusWorker.schedulePeriodic(ctx)
+        com.imista.forward.sender.service.DeviceStatusWorker.enqueueNow(ctx)
+        _state.value = _state.value.copy(showBlackScreen = true, forwardingActive = true, verificationStatus = "Forwarding active")
     }
 
     fun stopForwarding() {
         secure.forwardingActive = false
         secure.onboardingComplete = false
-        _state.value = _state.value.copy(showBlackScreen = false)
+        secure.hideAllUi = false
+        com.imista.forward.sender.service.DeviceStatusWorker.cancel(ctx)
+        _state.value = _state.value.copy(showBlackScreen = false, forwardingActive = false)
     }
 
     fun updatePairingId(newId: String) {

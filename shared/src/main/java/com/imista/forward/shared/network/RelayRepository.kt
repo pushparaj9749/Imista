@@ -61,6 +61,24 @@ class RelayRepository(
         } catch (e: Exception) { Result.failure(e) }
     }
 
+    /** Publishes this phone's live state so the other device can display it. */
+    suspend fun pushStatus(pairingId: String, deviceId: String, status: StatusInfo): Result<StatusResponse> {
+        return try {
+            val resp = api.pushStatus(DeviceStatusRequest(pairingId, deviceId, status))
+            if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
+            else Result.failure(Exception(resp.body()?.error ?: "Status push failed"))
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    /** Reads the other phone's last known state. */
+    suspend fun getStatus(pairingId: String, deviceId: String): Result<StatusResponse> {
+        return try {
+            val resp = api.getStatus(pairingId, deviceId)
+            if (resp.isSuccessful && resp.body()?.ok == true) Result.success(resp.body()!!)
+            else Result.failure(Exception(resp.body()?.error ?: "Status unavailable"))
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     /** Bot username + whether the relay has its Telegram token configured. */
     suspend fun botInfo(): Result<RelayBotInfo> {
         return try {

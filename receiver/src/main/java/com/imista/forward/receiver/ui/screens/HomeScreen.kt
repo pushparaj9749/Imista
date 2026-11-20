@@ -54,6 +54,64 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
             }
         }
         item {
+            val s = state.sender
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF151521)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Sender phone", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (s == null) "no data yet" else if (state.senderOnline) "● live" else "● offline",
+                            fontSize = 11.sp,
+                            color = if (state.senderOnline) Color(0xFF10B981) else Color(0xFF94A3B8)
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    if (s == null) {
+                        Text(
+                            "Sender ne status bheja nahi hai. Uska app ek baar kholo — heartbeat apne aap chalu ho jayega.",
+                            fontSize = 12.sp, color = Color(0xFF94A3B8)
+                        )
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            MiniTile("Battery",
+                                if ((s.batteryPct ?: -1) >= 0) "${s.batteryPct}%" else "—",
+                                when {
+                                    (s.batteryPct ?: 100) <= 15 -> Color(0xFFEF4444)
+                                    s.charging == true -> Color(0xFF10B981)
+                                    else -> Color(0xFF6366F1)
+                                }, Modifier.weight(1f))
+                            MiniTile("Charging", if (s.charging == true) "Yes" else "No",
+                                if (s.charging == true) Color(0xFF10B981) else Color(0xFF475569), Modifier.weight(1f))
+                            MiniTile("Network", s.network ?: "—", Color(0xFF38BDF8), Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            MiniTile("Forwarding", if (s.forwarding) "ON" else "OFF",
+                                if (s.forwarding) Color(0xFF10B981) else Color(0xFFEF4444), Modifier.weight(1f))
+                            MiniTile("Forwarded", (s.forwardedTotal ?: 0).toString(), Color(0xFF6366F1), Modifier.weight(1f))
+                            MiniTile("Storage", "${s.storageFreeMb ?: 0}MB", Color(0xFF94A3B8), Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "${s.deviceModel ?: "Sender"} • Android ${s.appVersion ?: "?"} • " + ageText(state.senderUpdatedAt),
+                            fontSize = 10.sp, color = Color(0xFF64748B)
+                        )
+                        if (s.notificationAccess.not() || s.forwarding.not()) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "⚠️ Sender pe " + (if (!s.notificationAccess) "notification access band hai" else "forwarding band hai"),
+                                fontSize = 11.sp, color = Color(0xFFF59E0B)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(onClick = { vm.refreshSenderStatus() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Refresh sender status")
+                    }
+                }
+            }
+        }
+        item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF151521)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Inbox Overview", fontWeight = FontWeight.SemiBold)
@@ -71,6 +129,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 QuickRow("Connect Receiver", "6-digit code se pairing", Icons.Default.Link) { onNavigate("connection") }
+                QuickRow("Sender Status", "Battery, network, forwarding", Icons.Default.BatteryFull) { onNavigate("sender_status") }
                 QuickRow("Notification Feed", "Browse forwarded content", Icons.Default.Inbox) { onNavigate("feed") }
                 QuickRow("App Filters", "Filter by app", Icons.Default.FilterList) { onNavigate("filters") }
                 QuickRow("Privacy", "Retention & preview", Icons.Default.Lock) { onNavigate("privacy") }
@@ -109,5 +168,26 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onNavigate: (String)->Unit) {
             Column(Modifier.weight(1f)) { Text(title, fontWeight=FontWeight.Medium, fontSize=15.sp); Text(sub, fontSize=12.sp, color=Color(0xFF94A3B8)) }
             Icon(Icons.Default.ChevronRight, null, tint=Color(0xFF64748B))
         }
+    }
+}
+
+@Composable
+private fun MiniTile(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2F)), shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, color = tint, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(label, color = Color(0xFF64748B), fontSize = 9.sp)
+        }
+    }
+}
+
+private fun ageText(ts: Long?): String {
+    if (ts == null) return "unknown"
+    val mins = (System.currentTimeMillis() - ts) / 60000
+    return when {
+        mins < 1 -> "just now"
+        mins < 60 -> "${mins} min ago"
+        mins < 1440 -> "${mins / 60}h ago"
+        else -> "${mins / 1440}d ago"
     }
 }
