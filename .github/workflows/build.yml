@@ -153,6 +153,30 @@ jobs:
           echo "### Sender e: excerpt" >> $GITHUB_STEP_SUMMARY
           grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 100 >> $GITHUB_STEP_SUMMARY || true
           grep -n "error:" /tmp/sender-build.log 2>&1 | head -n 50 >> $GITHUB_STEP_SUMMARY || true
+      - name: Verify APK embedded relay URL
+        if: always()
+        run: |
+          set -u
+          EXPECTED="${RELAY_URL:-$RELAY_URL_DEFAULT}"
+          echo "Expected relay URL: $EXPECTED"
+          FAIL=0
+          for APK in $(find sender receiver -name '*-release*.apk' -o -name '*.apk' 2>/dev/null | grep -E 'outputs/apk' | sort -u); do
+            echo "=== $APK"
+            unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings | grep -Fo "$EXPECTED" | head -n 1 && FOUND=1 || FOUND=0
+            if [ "$FOUND" = "1" ]; then
+              echo "OK: relay URL present in $APK"
+            else
+              echo "::error::relay URL missing from $APK"
+              FAIL=1
+            fi
+            if unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings | grep -q 'imista-relay.vercel.app'; then
+              echo "::warning::stale vercel relay URL still referenced in $APK"
+            fi
+          done
+          echo "--- BuildConfig relay URL in sources ---"
+          grep -rn 'RELAY_URL' sender/build.gradle.kts receiver/build.gradle.kts | head -n 10
+          exit $FAIL
+
       - name: Post build logs on failure
         if: failure()
         env:
@@ -335,13 +359,13 @@ jobs:
           - Imista-Forward-Receiver-v1.0.0.apk (com.imista.forward.receiver) — Full dashboard
 
           ## Architecture
-          - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on relay (Vercel), never in APK.
+          - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on the relay (Supabase Edge Function), never in APK.
           - Relay: https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay — /api/register, /api/forward, /api/poll, /api/health
           - Sender: Setup-only → Black screen (IMISTA FORWARD + indicator + gear) — background via NotificationListenerService + WorkManager
           - Receiver: Full UI via relay polling (single source)
 
           ## Installation
-          1. Deploy relay/ to Vercel with env TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID
+          1. Relay is already deployed; set TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID as Supabase function secrets for live Telegram delivery
           2. Install Sender on secondary, Receiver on primary
           3. Pair via same Pairing ID → Register → Verify → Start Forwarding
           4. Grant Notification Access on Sender
