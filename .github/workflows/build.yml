@@ -10,55 +10,8 @@ on:
 
 jobs:
   test:
-    name: Unit Tests
+    name: Unit Tests & Build
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew || true
-
-      - name: Check TELEGRAM_BOT_KEY secret presence (no leak)
-        env:
-          TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
-        run: |
-          if [ -z "$TELEGRAM_BOT_KEY" ]; then
-            echo "::warning::TELEGRAM_BOT_KEY secret not set — skipping Telegram live tests (expected for public CI). Local verification must be done manually."
-          else
-            echo "TELEGRAM_BOT_KEY secret is configured (length ${#TELEGRAM_BOT_KEY}) — will not print value."
-            # Validate format without exposing value
-            if echo "$TELEGRAM_BOT_KEY" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$'; then
-              echo "Bot token format looks valid."
-            else
-              echo "::warning::TELEGRAM_BOT_KEY format invalid — expected 123456:ABC..."
-            fi
-          fi
-
-      - name: Run unit tests (shared)
-        run: ./gradlew :shared:testDebugUnitTest --stacktrace || gradle :shared:test --stacktrace
-
-      - name: Run unit tests (sender)
-        run: ./gradlew :sender:testDebugUnitTest --stacktrace || gradle :sender:test --stacktrace
-        continue-on-error: true
-
-      - name: Run unit tests (receiver)
-        run: ./gradlew :receiver:testDebugUnitTest --stacktrace || gradle :receiver:test --stacktrace
-        continue-on-error: true
-
-  build:
-    name: Build APKs
-    runs-on: ubuntu-latest
-    needs: test
     steps:
       - uses: actions/checkout@v4
 
@@ -83,13 +36,37 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew || true
 
-      - name: Build Sender Release APK
+      - name: Check TELEGRAM_BOT_KEY secret presence (no leak)
+        env:
+          TELEGRAM_BOT_KEY: ${{ secrets.TELEGRAM_BOT_KEY }}
         run: |
-          ./gradlew :sender:assembleRelease --stacktrace || gradle :sender:assembleRelease --stacktrace
+          if [ -z "$TELEGRAM_BOT_KEY" ]; then
+            echo "::warning::TELEGRAM_BOT_KEY secret not set — skipping Telegram live tests (expected for public CI). Local verification must be done manually."
+          else
+            echo "TELEGRAM_BOT_KEY secret is configured (length ${#TELEGRAM_BOT_KEY}) — will not print value."
+            if echo "$TELEGRAM_BOT_KEY" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$'; then
+              echo "Bot token format looks valid."
+            else
+              echo "::warning::TELEGRAM_BOT_KEY format invalid — expected 123456:ABC..."
+            fi
+          fi
+
+      - name: Run unit tests (shared)
+        run: gradle :shared:testDebugUnitTest --stacktrace || ./gradlew :shared:testDebugUnitTest --stacktrace || gradle :shared:test --stacktrace
+
+      - name: Run unit tests (sender)
+        run: gradle :sender:testDebugUnitTest --stacktrace || ./gradlew :sender:testDebugUnitTest --stacktrace
+        continue-on-error: true
+
+      - name: Run unit tests (receiver)
+        run: gradle :receiver:testDebugUnitTest --stacktrace || ./gradlew :receiver:testDebugUnitTest --stacktrace
+        continue-on-error: true
+
+      - name: Build Sender Release APK
+        run: gradle :sender:assembleRelease --stacktrace || ./gradlew :sender:assembleRelease --stacktrace
 
       - name: Build Receiver Release APK
-        run: |
-          ./gradlew :receiver:assembleRelease --stacktrace || gradle :receiver:assembleRelease --stacktrace
+        run: gradle :receiver:assembleRelease --stacktrace || ./gradlew :receiver:assembleRelease --stacktrace
 
       - name: Rename APKs to release names
         run: |
@@ -98,8 +75,8 @@ jobs:
           find receiver/build/outputs -name "*.apk" -type f | head -n 20
           SENDER_APK=$(find sender/build/outputs -name "*.apk" | head -n 1)
           RECEIVER_APK=$(find receiver/build/outputs -name "*.apk" | head -n 1)
-          if [ -z "$SENDER_APK" ]; then echo "Sender APK not found"; exit 1; fi
-          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; exit 1; fi
+          if [ -z "$SENDER_APK" ]; then echo "Sender APK not found"; ls -R sender/build | head -n 100; exit 1; fi
+          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; ls -R receiver/build | head -n 100; exit 1; fi
           cp "$SENDER_APK" artifacts/Imista-Forward-Sender-v1.0.0.apk
           cp "$RECEIVER_APK" artifacts/Imista-Forward-Receiver-v1.0.0.apk
           ls -lh artifacts/
@@ -160,7 +137,7 @@ jobs:
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    needs: build
+    needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
