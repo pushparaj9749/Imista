@@ -2,6 +2,16 @@
 
 All notable changes to Imista Forward are documented here.
 
+## [1.1.0] — 2026-11-20
+
+### Changed — token leaves the phones completely
+- **6-digit pairing code**: `POST /api/register` mints a code for the Sender; the Receiver joins with the same code. No UUID copying, no shared secret typed anywhere.
+- **Telegram auto-link**: `GET /api/link?code=NNNNNN` scans bot updates for the `/start NNNNNN` deep link and stores the chat id in `imista_pairings.telegram_chat_id`. New `GET /api/bot` exposes the bot username so the apps can build the deep link.
+- **Receiver UI**: bot-token and chat-id inputs removed everywhere. "Connect Receiver" is code + optional one-tap Telegram link + "Fetch now".
+- **Sender UI**: setup shows the relay-minted code and an optional "Link Telegram"; the old Telegram Configuration screen is now a read-only connection/status screen.
+- **Receiver polling fixed**: `RelayPollingWorker` was a stub that returned success without polling. It now polls the relay, dedupes into Room (`exists()` query), honours `mirror_local`, and advances the `relay_since` cursor. Boot receiver now re-arms relay polling.
+- CI fails if any app source ships a hardcoded bot token or any screen asks for a token/chat id.
+
 ## [1.0.0] — 2026-11-20
 
 ### Added

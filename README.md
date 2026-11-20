@@ -9,28 +9,35 @@ Repository: `pushparaj9749/Imista` • Branch: `arena/cf8a3fb5-imista`
 
 ---
 
-## ⚡️ Quick Start (2 Phones + 1 Bot)
+## ⚡️ Quick Start (2 Phones — no token on the phones)
 
-### 1. Create your Telegram Bot
-1. Open Telegram → search **@BotFather** → `/newbot` → follow prompts → copy token like `123456789:AAH...` **Never hardcode this token.**
-2. On **both phones**, open Telegram → search your new bot → press **Start** → send any message (e.g., `/start`). This creates the authorized private chat.
-3. Find your **Chat ID**: message **@userinfobot** on Telegram, or open in browser `https://api.telegram.org/bot<TOKEN>/getUpdates` after messaging the bot — look for `chat.id`.
+**You never type a bot token or chat ID on any phone.** The token lives only in the relay's server
+secrets (Supabase). Pairing is one 6-digit code, like a WhatsApp login code.
 
-### 2. Install Apps
-- Download from GitHub Releases:
-  - `Imista-Forward-Sender-v1.0.0.apk`
-  - `Imista-Forward-Receiver-v1.0.0.apk`
+### 1. Install Apps
+- Download from GitHub Releases (`v1.1.0`):
+  - `Imista-Forward-Sender-v1.1.0.apk`
+  - `Imista-Forward-Receiver-v1.1.0.apk`
 - Alternatively build locally (see Build section).
 
 Install **Sender** on the secondary (unused) phone, **Receiver** on your main phone.
 
-### 3. Configure Both Apps
-In **each app** → **Telegram Configuration**:
-- Paste same **Bot Token**
-- Paste same **Chat ID**
-- Tap **Test & Send Verification** → you should receive `✅ Telegram connection successful!` in Telegram.
+### 2. Pair with a 6-digit code
+1. Open **Sender** → Setup → tap **Naya code**. The relay mints a code such as `813593`.
+2. Open **Receiver** → **Connect Receiver** → type that code → **Connect**.
+3. Done. Sender's notifications now go Sender → relay → Receiver feed.
 
-Sender additionally shows **QR Pairing Payload** (`pairingId|chatId|role` base64). Receiver can scan/decode this to confirm same pairing identity. Pairing uses authenticated UUIDs, not guessable codes.
+### 3. Optional: also deliver to Telegram (no token typed anywhere)
+The relay holds `TELEGRAM_BOT_KEY` server-side. If it is configured:
+1. Receiver → **Connect Receiver** → **Open bot** (or on Sender: **Link Telegram**).
+2. Press **Start** in Telegram (the deep link already carries your code).
+3. Tap **Link Telegram** — the relay detects the `/start <code>` message, stores the chat,
+   and from then on every forward is also delivered to that chat.
+
+Nothing is pasted and no token/chat ID is stored on either phone.
+
+> If the relay reports `telegramConfigured:false` (see the latest automated report on the
+> relay-probe issue), Telegram delivery is simply off — in-app delivery via relay polling still works.
 
 ### 4. Grant Permissions
 
