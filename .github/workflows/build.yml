@@ -107,12 +107,23 @@ jobs:
           ls -lh receiver/build/outputs/ 2>&1 | head -n 100 || echo "no receiver/build/outputs"
           exit $EXIT
 
-      - name: Upload Receiver build log on failure
-        if: failure() && steps.build_receiver.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: receiver-build-log
-          path: /tmp/receiver-build.log
+      - name: Upload Receiver build log to Gist on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Uploading receiver build log to Gist for debugging..."
+          if [ -f /tmp/receiver-build.log ]; then
+            gh gist create --public --filename receiver-build.log /tmp/receiver-build.log || echo "gist failed"
+            echo "=== Receiver log tail ==="
+            tail -n 300 /tmp/receiver-build.log
+          fi
+          if [ -f /tmp/sender-build.log ]; then
+            echo "=== Sender log tail ==="
+            tail -n 100 /tmp/sender-build.log
+          fi
+          # Also try sender log gist
+          if [ -f /tmp/sender-build.log ]; then gh gist create --public --filename sender-build.log /tmp/sender-build.log || true; fi
 
       - name: Verify no token embedded
         if: always()
