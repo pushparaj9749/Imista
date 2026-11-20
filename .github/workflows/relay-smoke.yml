@@ -1,0 +1,25 @@
+name: Relay Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'relay/**'
+
+jobs:
+  smoke:
+    name: Probe relay health endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe production alias and deployment URLs
+        run: |
+          for URL in \
+            "https://imista-relay.vercel.app/api/health" \
+            "https://imista-relay-wsta.vercel.app/api/health" \
+            "https://imista-relay-9wear88y4-wsta.vercel.app/api/health"; do
+            echo "=== $URL"
+            CODE=$(curl -sS -L --max-time 25 -o /tmp/body.txt -w '%{http_code}' "$URL" || echo "000")
+            echo "HTTP $CODE"
+            head -c 600 /tmp/body.txt || true
+            echo
+          done
