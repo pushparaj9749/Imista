@@ -119,6 +119,19 @@ jobs:
         with:
           name: build-logs
           path: /tmp/*-build.log
+      - name: Extract e: lines from build logs
+        if: failure()
+        run: |
+          echo "=== Sender e: lines ==="
+          grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 200 || true
+          echo "=== Sender error: lines ==="
+          grep -n "error:" /tmp/sender-build.log 2>&1 | head -n 100 || true
+          echo "=== Receiver e: lines ==="
+          grep -n "^e: " /tmp/receiver-build.log 2>&1 | head -n 200 || true
+          # Also emit to github step summary
+          echo "### Sender e: excerpt" >> $GITHUB_STEP_SUMMARY
+          grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 100 >> $GITHUB_STEP_SUMMARY || true
+          grep -n "error:" /tmp/sender-build.log 2>&1 | head -n 50 >> $GITHUB_STEP_SUMMARY || true
       - name: Post build logs on failure
         if: failure()
         uses: actions/github-script@v7
