@@ -67,3 +67,6 @@ TELEGRAM_BOT_KEY=dummy SUPABASE_URL='' vercel dev
 `GET /api/health` returns `{ok:true,...}` for both the Android apps and CI smoke tests.
 
 _Verified via CI smoke test._
+
+## Supabase Edge fallback
+`https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health`
