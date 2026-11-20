@@ -154,7 +154,19 @@ jobs:
             let slog = '';
             try { rlog = fs.readFileSync('/tmp/receiver-build.log', 'utf8'); } catch(e) {}
             try { slog = fs.readFileSync('/tmp/sender-build.log', 'utf8'); } catch(e) {}
-            const findError = (log) => { const lines=log.split('\n'); let idx=-1; for(let i=lines.length-1;i>=0;i--) if(lines[i].includes('e: ')||lines[i].includes('FAILED')||lines[i].includes('error:')) {idx=i; break;} if(idx>=0) return lines.slice(Math.max(0,idx-60), idx+80).join('\n').slice(0,8000); return lines.slice(-400).join('\n').slice(0,8000); };
+            const findError = (log) => {
+              const ls=log.split('\\n');
+              const eLs = ls.filter(l => l.includes('e: '));
+              if (eLs.length > 0) {
+                let idx2 = ls.findIndex(l => l.includes('e: '));
+                let excerpt = ls.slice(Math.max(0, idx2-20), Math.min(ls.length, idx2+60)).join('\\n');
+                let allE = eLs.slice(0,30).join('\\n');
+                return excerpt + '\\n--- ALL e: lines (first 30) ---\\n' + allE;
+              }
+              let idx=-1; for(let j=ls.length-1;j>=0;j--) if(ls[j].includes('FAILED')) {idx=j; break;}
+              if(idx>=0) return ls.slice(Math.max(0,idx-80), idx+20).join('\\n').slice(0,8000);
+              return ls.slice(-600).join('\\n').slice(0,8000);
+            };
             const rtail = findError(rlog);
             const stail = findError(slog);
             const body = `**Build failure logs**\n\n**Sender error excerpt:**\n\`\`\`\n${stail}\n\`\`\`\n\n**Receiver error excerpt:**\n\`\`\`\n${rtail}\n\`\`\``;
