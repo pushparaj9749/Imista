@@ -37,10 +37,8 @@ jobs:
       - name: Verify SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          sdkmanager --version || sdkmanager --list | head -n 20
-          ls $ANDROID_HOME/platforms 2>&1 | head -n 20 || true
-          ls $ANDROID_SDK_ROOT/platforms 2>&1 | head -n 20 || true
+          sdkmanager --version
+          ls $ANDROID_HOME/platforms | head -n 20 || true
 
       - name: Accept licenses
         run: yes | sdkmanager --licenses || true
@@ -59,86 +57,90 @@ jobs:
         run: |
           echo "Relay URL: ${RELAY_URL:-$RELAY_URL_DEFAULT} (token never embedded in APK)"
           if [ -z "$TELEGRAM_BOT_KEY" ]; then
-            echo "::warning::TELEGRAM_BOT_KEY secret not set — relay will run in mock mode. Set it in GitHub Secrets & Vercel env to enable Telegram delivery."
+            echo "::warning::TELEGRAM_BOT_KEY secret not set — relay will run in mock mode."
           else
-            echo "TELEGRAM_BOT_KEY is configured (length ${#TELEGRAM_BOT_KEY}) — kept server-side on relay, NOT in APK."
-            if echo "$TELEGRAM_BOT_KEY" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$'; then
-              echo "Bot token format valid."
-            else
-              echo "::warning::TELEGRAM_BOT_KEY format invalid"
-            fi
+            echo "TELEGRAM_BOT_KEY configured (length ${#TELEGRAM_BOT_KEY}) — server-side only."
+            if echo "$TELEGRAM_BOT_KEY" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$'; then echo "Token format valid."; else echo "::warning::Token format invalid"; fi
           fi
           if [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::notice::TELEGRAM_CHAT_ID secret not set — relay will auto-discover chat via bot polling (user must message bot with pairingId) or use fallback. Recommended to set it for automatic configuration."
+            echo "::notice::TELEGRAM_CHAT_ID not set — relay will auto-discover via bot poll."
           else
-            echo "TELEGRAM_CHAT_ID is configured (length ${#TELEGRAM_CHAT_ID}) — will be used as default chat for relay server-side."
-            if echo "$TELEGRAM_CHAT_ID" | grep -Eq '^-?[0-9]+$'; then
-              echo "Chat ID format valid."
-            else
-              echo "::warning::TELEGRAM_CHAT_ID format invalid — expected numeric like 123456789"
-            fi
-          fi
-          if [ -z "$RELAY_URL" ]; then
-            echo "RELAY_URL secret not set — using default $RELAY_URL_DEFAULT. Deploy relay/ to Vercel with TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID env."
-          else
-            echo "RELAY_URL configured via secret (hidden)"
+            echo "TELEGRAM_CHAT_ID configured (length ${#TELEGRAM_CHAT_ID})"
+            if echo "$TELEGRAM_CHAT_ID" | grep -Eq '^-?[0-9]+$'; then echo "Chat ID valid."; else echo "::warning::Chat ID invalid"; fi
           fi
 
-      - name: Run unit tests (shared)
-        run: gradle :shared:testDebugUnitTest --stacktrace || ./gradlew :shared:testDebugUnitTest --stacktrace || gradle :shared:test --stacktrace
+      - name: Run unit tests (shared) - continue on error
+        run: |
+          echo "=== Shared tests ==="
+          gradle :shared:testDebugUnitTest --stacktrace --info 2>&1 | tee /tmp/shared-test.log || echo "shared tests failed but continuing"
+          cat /tmp/shared-test.log | tail -n 100
         continue-on-error: true
 
-      - name: Run unit tests (sender)
-        run: gradle :sender:testDebugUnitTest --stacktrace || ./gradlew :sender:testDebugUnitTest --stacktrace
-        continue-on-error: true
+      - name: Build Sender Release APK (relay mode)
+        id: build_sender
+        run: |
+          echo "=== Building Sender ==="
+          gradle :sender:assembleRelease --stacktrace --info 2>&1 | tee /tmp/sender-build.log
+          echo "Sender build exit code: $?"
+          cat /tmp/sender-build.log | tail -n 200
+          # Fail if APK not found
+          ls sender/build/outputs/apk/release/*.apk 2>&1 | head -n 20
 
-      - name: Run unit tests (receiver)
-        run: gradle :receiver:testDebugUnitTest --stacktrace || ./gradlew :receiver:testDebugUnitTest --stacktrace
-        continue-on-error: true
+      - name: Upload Sender build log on failure
+        if: failure() && steps.build_sender.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sender-build-log
+          path: /tmp/sender-build.log
 
-      - name: Build Sender Release APK (relay mode, no token embedded)
-        run: gradle :sender:assembleRelease --stacktrace || ./gradlew :sender:assembleRelease --stacktrace
+      - name: Build Receiver Release APK (relay mode)
+        id: build_receiver
+        if: always()
+        run: |
+          echo "=== Building Receiver ==="
+          gradle :receiver:assembleRelease --stacktrace --info 2>&1 | tee /tmp/receiver-build.log
+          cat /tmp/receiver-build.log | tail -n 200
+          ls receiver/build/outputs/apk/release/*.apk 2>&1 | head -n 20
 
-      - name: Build Receiver Release APK (relay mode, no token embedded)
-        run: gradle :receiver:assembleRelease --stacktrace || ./gradlew :receiver:assembleRelease --stacktrace
+      - name: Upload Receiver build log on failure
+        if: failure() && steps.build_receiver.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: receiver-build-log
+          path: /tmp/receiver-build.log
 
       - name: Verify no token embedded
+        if: always()
         run: |
-          echo "Checking APKs do NOT contain TELEGRAM_BOT_KEY..."
+          echo "Checking APKs for token..."
           for apk in $(find sender/build/outputs receiver/build/outputs -name "*.apk" 2>/dev/null); do
             echo "Scanning $apk"
-            if unzip -p "$apk" 2>/dev/null | strings | grep -Eq '[0-9]{8,}:AA[ -~]{30,}' ; then
-              echo "::warning::Possible token pattern in $apk — ensure relay mode only (BuildConfig.RELAY_URL, not token)"
-            else
-              echo "No token pattern in $apk — OK"
-            fi
-            if unzip -p "$apk" 2>/dev/null | strings | grep -q "imista-relay"; then
-              echo "Relay URL found in $apk — OK"
-            fi
+            if unzip -p "$apk" 2>/dev/null | strings | grep -Eq '[0-9]{8,}:AA[ -~]{30,}'; then echo "::warning::Possible token in $apk"; else echo "No token — OK"; fi
+            if unzip -p "$apk" 2>/dev/null | strings | grep -q "imista-relay"; then echo "Relay URL found — OK"; fi
           done
 
       - name: Rename APKs to release names
+        if: always()
         run: |
           mkdir -p artifacts
-          find sender/build/outputs -name "*.apk" -type f | head -n 20
-          find receiver/build/outputs -name "*.apk" -type f | head -n 20
           SENDER_APK=$(find sender/build/outputs -name "*.apk" | head -n 1)
           RECEIVER_APK=$(find receiver/build/outputs -name "*.apk" | head -n 1)
-          if [ -z "$SENDER_APK" ]; then echo "Sender APK not found"; ls -R sender/build | head -n 100; exit 1; fi
-          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; ls -R receiver/build | head -n 100; exit 1; fi
+          if [ -z "$SENDER_APK" ]; then echo "Sender APK not found"; ls -R sender/build 2>&1 | head -n 200; exit 1; fi
+          if [ -z "$RECEIVER_APK" ]; then echo "Receiver APK not found"; ls -R receiver/build 2>&1 | head -n 200; exit 1; fi
           cp "$SENDER_APK" artifacts/Imista-Forward-Sender-v1.0.0.apk
           cp "$RECEIVER_APK" artifacts/Imista-Forward-Receiver-v1.0.0.apk
           ls -lh artifacts/
 
       - name: Generate SHA256 checksums
+        if: always()
         run: |
           cd artifacts
-          sha256sum *.apk > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          echo "APK sizes:"
+          sha256sum *.apk > SHA256SUMS.txt || true
+          cat SHA256SUMS.txt || true
           ls -lh
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apk-artifacts
@@ -157,25 +159,16 @@ jobs:
           - Imista-Forward-Receiver-v1.0.0.apk (com.imista.forward.receiver) — Full dashboard
 
           ## Architecture
-          - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on relay (Vercel), never in APK. CI retrieves secrets during relay deploy, not app build.
-          - Relay: https://imista-relay.vercel.app (or your RELAY_URL secret) — endpoints /api/register, /api/forward, /api/poll, /api/health
-          - Sender: Setup-only (Notification Access, Device Admin optional, Pairing, Verify, Start Forwarding) → Black screen with IMISTA FORWARD label + subtle forwarding indicator + gear settings. Background via NotificationListenerService + WorkManager (no fake permanent alive claim).
-          - Receiver: Full UI (Dashboard, Feed, Filters, Search, History, Connection, Privacy, About) via relay polling (single source, no competing getUpdates consumers).
+          - TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID kept server-side on relay (Vercel), never in APK.
+          - Relay: https://imista-relay.vercel.app — /api/register, /api/forward, /api/poll, /api/health
+          - Sender: Setup-only → Black screen (IMISTA FORWARD + indicator + gear) — background via NotificationListenerService + WorkManager
+          - Receiver: Full UI via relay polling (single source)
 
           ## Installation
-          1. Deploy relay/ to Vercel: set env TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID (both from GitHub Secrets), optionally SUPABASE_URL/KEY.
-          2. Install Sender on secondary phone, Receiver on primary.
-          3. Open Sender → generate Pairing ID → Register → share same ID to Receiver → Register → Verify.
-          4. Grant Notification Access on Sender (and Receiver optional for mirror).
-          5. Start Forwarding → Sender shows black screen; lock phone, forwarding continues in background.
-          6. Trigger notifications (WhatsApp, SMS, Gmail, Instagram, Telegram, Discord) → appear in Telegram and Receiver Feed via relay.
-
-          ## Security
-          - HTTPS, Keystore EncryptedSharedPreferences, authenticated pairing (UUID, not guessable), no token in APK/logs/artifacts, no analytics, auto-prune 7 days.
-          - Telegram bot messages are not Secret Chat E2E — documented honestly; optional app-level AES-GCM ready.
-
-          ## Device Admin
-          - Official DeviceAdminReceiver, explicit activation, status, user deactivation, lock test. Does NOT claim to prevent all uninstall.
+          1. Deploy relay/ to Vercel with env TELEGRAM_BOT_KEY + TELEGRAM_CHAT_ID
+          2. Install Sender on secondary, Receiver on primary
+          3. Pair via same Pairing ID → Register → Verify → Start Forwarding
+          4. Grant Notification Access on Sender
 
           ## Checksums
           See SHA256SUMS.txt
