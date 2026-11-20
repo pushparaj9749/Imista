@@ -15,45 +15,76 @@ jobs:
   check:
     name: Probe relay endpoints
     runs-on: ubuntu-latest
+    env:
+      RELAY: "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay"
     steps:
-      - name: Probe
+      - name: Health
+        run: |
+          set -u
+          OUT=/tmp/report.md
+          echo "### Relay E2E $(date -u +%FT%TZ)" > "$OUT"
+          echo "" >> "$OUT"
+          probe() {
+            U="$1"; echo "########## $U"
+            CODE=$(curl -sS -L --max-time 30 -o /tmp/b -w '%{http_code}' "$U" 2>/tmp/err || echo "000")
+            BODY=$(head -c 400 /tmp/b 2>/dev/null | tr '\n' ' ')
+            echo "HTTP $CODE"; echo "BODY $BODY"
+            { echo "- \`$U\` → HTTP **$CODE**"; echo '  ```'; echo "  $BODY"; echo '  ```'; } >> "$OUT"
+          }
+          probe "$RELAY/api/health"
+          echo "----- current report -----"; cat "$OUT"
+          cp "$OUT" /tmp/health.md
+
+      - name: End-to-end round trip
+        run: |
+          set -u
+          PAIR="11111111-2222-3333-4444-555555555555"
+          SENDER="sender-ci"
+          RECEIVER="receiver-ci"
+          OUT=/tmp/e2e.md
+          echo "" > "$OUT"
+          log() { echo "$1"; echo "$1" >> "$OUT"; }
+
+          log "#### Register sender"
+          R1=$(curl -sS -m 30 -X POST "$RELAY/api/register" -H 'Content-Type: application/json' \
+            -d "{\"pairingId\":\"$PAIR\",\"deviceId\":\"$SENDER\",\"role\":\"SENDER\"}")
+          log "\`$R1\`"
+
+          log "#### Register receiver"
+          R2=$(curl -sS -m 30 -X POST "$RELAY/api/register" -H 'Content-Type: application/json' \
+            -d "{\"pairingId\":\"$PAIR\",\"deviceId\":\"$RECEIVER\",\"role\":\"RECEIVER\"}")
+          log "\`$R2\`"
+
+          log "#### Forward a notification"
+          MSGID="ci-$(date +%s)"
+          F=$(curl -sS -m 30 -X POST "$RELAY/api/forward" -H 'Content-Type: application/json' \
+            -H "X-Pairing-Id: $PAIR" -H "X-Device-Id: $SENDER" \
+            -d "{\"payload\":{\"id\":\"$MSGID\",\"packageName\":\"com.whatsapp\",\"appName\":\"WhatsApp\",\"title\":\"CI test\",\"text\":\"hello from ci\",\"timestamp\":$(date +%s000)}}")
+          log "\`$F\`"
+
+          log "#### Poll as receiver"
+          P=$(curl -sS -m 30 "$RELAY/api/poll?pairingId=$PAIR&deviceId=$RECEIVER&since=0&limit=10")
+          log "\`$P\`"
+
+          log "#### Unauthorized forward must be 403"
+          U=$(curl -sS -m 30 -o /tmp/u.txt -w '%{http_code}' -X POST "$RELAY/api/forward" -H 'Content-Type: application/json' \
+            -H "X-Pairing-Id: $PAIR" -H "X-Device-Id: intruder" -d '{"payload":{"id":"x","text":"nope"}}')
+          log "status=$U body=\`$(cat /tmp/u.txt)\`"
+
+          echo "$P" | grep -q "$MSGID" && log "✅ message reached receiver via poll" || log "❌ message NOT found in poll"
+
+      - name: Publish report to tracking issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           set -u
-          OUT=/tmp/report.md
-          echo "### Relay probe $(date -u +%FT%TZ)" > "$OUT"
-          echo "" >> "$OUT"
-          probe() {
-            U="$1"
-            echo "########## $U"
-            CODE=$(curl -sS -L --max-time 30 -o /tmp/b -w '%{http_code}' "$U" 2>/tmp/err || echo "000")
-            BODY=$(head -c 300 /tmp/b 2>/dev/null | tr '\n' ' ')
-            ERR=$(head -c 120 /tmp/err 2>/dev/null | tr '\n' ' ')
-            echo "HTTP $CODE"
-            echo "BODY $BODY"
-            echo "ERR  $ERR"
-            {
-              echo "- \`$U\` → HTTP **$CODE**"
-              echo '  ```'
-              echo "  $BODY"
-              echo "  $ERR"
-              echo '  ```'
-            } >> "$OUT"
-          }
-          probe "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health"
-          probe "https://imista-relay.vercel.app/api/health"
-          probe "https://wsta.vercel.app/"
-
-          echo "----- report -----"
-          cat "$OUT"
-
-          # Publish the report to a tracking issue so results are readable from outside Actions.
+          BODY=$(cat /tmp/health.md /tmp/e2e.md)
+          echo "$BODY"
           ISSUE=$(gh api "repos/$REPO/issues?labels=relay-probe&state=open" --jq '.[0].number' 2>/dev/null || true)
           if [ -z "$ISSUE" ] || [ "$ISSUE" = "null" ]; then
             gh api "repos/$REPO/labels" -f name=relay-probe -f color=0e8a16 >/dev/null 2>&1 || true
-            ISSUE=$(gh api "repos/$REPO/issues" -f title="Relay probe report" -f body="Automated relay reachability reports are posted here." -f labels[]=relay-probe --jq '.number')
+            ISSUE=$(gh api "repos/$REPO/issues" -f title="Relay probe report" -f body="Automated relay E2E reports." -f "labels[]=relay-probe" --jq '.number')
           fi
-          gh api "repos/$REPO/issues/$ISSUE/comments" -f body="$(cat "$OUT")" >/dev/null
-          echo "Posted report to issue #$ISSUE"
+          gh api "repos/$REPO/issues/$ISSUE/comments" -f body="$BODY" >/dev/null
+          echo "posted to #$ISSUE"
