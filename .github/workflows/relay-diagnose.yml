@@ -10,12 +10,17 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: DNS + TLS + HTTP diagnostics
+      - name: Probe candidate relay hosts
         run: |
-          set -x
-          for H in imista-relay.vercel.app imista-relay-wsta.vercel.app wsta.vercel.app; do
-            echo "########## $H"
-            getent hosts "$H" || echo "no dns"
-            timeout 20 openssl s_client -connect "$H:443" -servername "$H" </dev/null 2>&1 | head -20 || true
-            curl -sS -o /dev/null -m 20 -w "code=%{http_code} ssl=%{ssl_verify_result} ip=%{remote_ip}\n" "https://$H/" || true
+          set -u
+          for U in \
+            "https://imista-relay.vercel.app/api/health" \
+            "https://imista-relay-app.vercel.app/api/health" \
+            "https://imista-relay-wsta.vercel.app/api/health" \
+            "https://imista-relay-abwayhc3k-wsta.vercel.app/api/health" \
+            "https://wsta.vercel.app/" ; do
+            echo "########## $U"
+            curl -sS -L --max-time 25 -o /tmp/b -w 'code=%{http_code} size=%{size_download} redirects=%{num_redirects}\n' "$U" 2>&1 || echo "curl-error"
+            head -c 240 /tmp/b 2>/dev/null || true
+            echo
           done
