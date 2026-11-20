@@ -25,10 +25,14 @@ android {
         buildConfigField("String", "RELAY_VERSION", "\"1.0.0\"")
     }
 
+    signingConfigs {
+        getByName("debug")
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -36,6 +40,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     lint {
