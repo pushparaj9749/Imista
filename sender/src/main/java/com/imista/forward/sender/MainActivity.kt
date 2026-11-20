@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,7 +59,7 @@ fun SenderRootWithPermissions() {
         return androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
-    val postNotifLauncher = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val postNotifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         // after post notif, check listener
         if (!isNotificationListenerEnabled()) showListenerDialog = true
         setupVm.refresh()
@@ -119,19 +120,9 @@ fun SenderRootWithPermissions() {
         )
     }
 
-    // After permissions checked, show normal nav
-    // We keep refreshing listener status when returning from settings
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                setupVm.refresh()
-                // if we were waiting and user enabled, hide dialog
-                if (isNotificationListenerEnabled()) showListenerDialog = false
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    // Refresh when returning from settings via simple effect
+    LaunchedEffect(showListenerDialog) {
+        if (!showListenerDialog) setupVm.refresh()
     }
 
     SenderRoot(secure, setupVm)

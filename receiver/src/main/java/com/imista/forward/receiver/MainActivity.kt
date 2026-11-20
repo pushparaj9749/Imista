@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -48,7 +49,7 @@ fun ReceiverRootWithPermissions() {
         if (Build.VERSION.SDK_INT < 33) return true
         return androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
-    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
         if (!isListenerEnabled()) showListenerDialog = true
     }
 
@@ -82,12 +83,7 @@ fun ReceiverRootWithPermissions() {
         )
     }
 
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e==androidx.lifecycle.Lifecycle.Event.ON_RESUME) { /* refresh */ } }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
-    }
+    // no-op lifecycle refresh for now
 
     ReceiverNav()
 }
