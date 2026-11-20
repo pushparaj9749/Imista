@@ -1,0 +1,32 @@
+name: Relay Check
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'relay/**'
+      - '.github/workflows/relay-check.yml'
+
+jobs:
+  check:
+    name: Probe relay endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe
+        run: |
+          set -u
+          probe() {
+            U="$1"
+            echo "########## $U"
+            CODE=$(curl -sS -L --max-time 30 -o /tmp/b -w '%{http_code}' "$U" 2>/tmp/err || echo "000")
+            echo "HTTP $CODE"
+            echo "----- body -----"
+            head -c 500 /tmp/b 2>/dev/null || true
+            echo
+            echo "----- err -----"
+            head -c 300 /tmp/err 2>/dev/null || true
+            echo "::notice title=$U::$CODE $(head -c 220 /tmp/b 2>/dev/null | tr '\n' ' ')"
+          }
+          probe "https://effpkfajwqetiddcqopi.supabase.co/functions/v1/imista-relay/api/health"
+          probe "https://imista-relay.vercel.app/api/health"
+          probe "https://wsta.vercel.app/"
