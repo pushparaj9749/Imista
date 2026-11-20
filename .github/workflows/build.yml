@@ -152,27 +152,35 @@ jobs:
           echo "Posting build failure excerpt as commit comment..."
           if [ -f /tmp/sender-build.log ]; then
             SENDER_E=$(grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 40 || true)
+            SENDER_FAILED=$(grep -n "FAILED\|FAILURE\|Execution failed" /tmp/sender-build.log 2>&1 | head -n 40 || true)
             SENDER_CTX=""
             if [ -n "$SENDER_E" ]; then
               FIRST_LINE=$(echo "$SENDER_E" | head -n1 | cut -d: -f1)
               SENDER_CTX=$(sed -n "$((FIRST_LINE>20?FIRST_LINE-20:1)),$((FIRST_LINE+60))p" /tmp/sender-build.log 2>&1 | head -n 200)
+            elif [ -n "$SENDER_FAILED" ]; then
+              FIRST_LINE=$(echo "$SENDER_FAILED" | head -n1 | cut -d: -f1)
+              SENDER_CTX=$(sed -n "$((FIRST_LINE>40?FIRST_LINE-40:1)),$((FIRST_LINE+80))p" /tmp/sender-build.log 2>&1 | head -n 400)
             else
-              SENDER_CTX=$(tail -n 400 /tmp/sender-build.log 2>&1 | head -n 400)
+              SENDER_CTX=$(tail -n 600 /tmp/sender-build.log 2>&1 | tail -n 400)
             fi
           else
-            SENDER_E="no sender log"; SENDER_CTX="no sender log"
+            SENDER_E="no sender log"; SENDER_FAILED="no sender log"; SENDER_CTX="no sender log"
           fi
           if [ -f /tmp/receiver-build.log ]; then
             RECEIVER_E=$(grep -n "^e: " /tmp/receiver-build.log 2>&1 | head -n 40 || true)
+            RECEIVER_FAILED=$(grep -n "FAILED\|FAILURE\|Execution failed" /tmp/receiver-build.log 2>&1 | head -n 40 || true)
             RECEIVER_CTX=""
             if [ -n "$RECEIVER_E" ]; then
               FIRST_LINE=$(echo "$RECEIVER_E" | head -n1 | cut -d: -f1)
               RECEIVER_CTX=$(sed -n "$((FIRST_LINE>20?FIRST_LINE-20:1)),$((FIRST_LINE+60))p" /tmp/receiver-build.log 2>&1 | head -n 200)
+            elif [ -n "$RECEIVER_FAILED" ]; then
+              FIRST_LINE=$(echo "$RECEIVER_FAILED" | head -n1 | cut -d: -f1)
+              RECEIVER_CTX=$(sed -n "$((FIRST_LINE>40?FIRST_LINE-40:1)),$((FIRST_LINE+80))p" /tmp/receiver-build.log 2>&1 | head -n 400)
             else
-              RECEIVER_CTX=$(tail -n 400 /tmp/receiver-build.log 2>&1 | head -n 400)
+              RECEIVER_CTX=$(tail -n 600 /tmp/receiver-build.log 2>&1 | tail -n 400)
             fi
           else
-            RECEIVER_E="no receiver log"; RECEIVER_CTX="no receiver log"
+            RECEIVER_E="no receiver log"; RECEIVER_FAILED="no receiver log"; RECEIVER_CTX="no receiver log"
           fi
           cat > /tmp/comment_body.md <<'CMEOF'
           **Build failure — Sender e: lines**
@@ -180,18 +188,30 @@ jobs:
           echo '```' >> /tmp/comment_body.md
           echo "$SENDER_E" | head -c 6000 >> /tmp/comment_body.md
           echo '```' >> /tmp/comment_body.md
-          echo '**Sender context (20 before / 60 after first e:)**' >> /tmp/comment_body.md
+          if [ -n "$SENDER_FAILED" ]; then
+            echo '**Sender FAILED lines**' >> /tmp/comment_body.md
+            echo '```' >> /tmp/comment_body.md
+            echo "$SENDER_FAILED" | head -c 4000 >> /tmp/comment_body.md
+            echo '```' >> /tmp/comment_body.md
+          fi
+          echo '**Sender context (around first e: or FAILED)**' >> /tmp/comment_body.md
           echo '```' >> /tmp/comment_body.md
-          echo "$SENDER_CTX" | head -c 6000 >> /tmp/comment_body.md
+          echo "$SENDER_CTX" | head -c 7000 >> /tmp/comment_body.md
           echo '```' >> /tmp/comment_body.md
           echo '**Receiver e: lines**' >> /tmp/comment_body.md
           echo '```' >> /tmp/comment_body.md
           echo "$RECEIVER_E" | head -c 4000 >> /tmp/comment_body.md
           echo '```' >> /tmp/comment_body.md
+          if [ -n "$RECEIVER_FAILED" ]; then
+            echo '**Receiver FAILED lines**' >> /tmp/comment_body.md
+            echo '```' >> /tmp/comment_body.md
+            echo "$RECEIVER_FAILED" | head -c 4000 >> /tmp/comment_body.md
+            echo '```' >> /tmp/comment_body.md
+          fi
           if [ -n "$RECEIVER_CTX" ] && [ "$RECEIVER_CTX" != "no receiver log" ]; then
             echo '**Receiver context**' >> /tmp/comment_body.md
             echo '```' >> /tmp/comment_body.md
-            echo "$RECEIVER_CTX" | head -c 4000 >> /tmp/comment_body.md
+            echo "$RECEIVER_CTX" | head -c 6000 >> /tmp/comment_body.md
             echo '```' >> /tmp/comment_body.md
           fi
           cat /tmp/comment_body.md | head -n 200
