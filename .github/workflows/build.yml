@@ -123,8 +123,8 @@ jobs:
             let slog = '';
             try { rlog = fs.readFileSync('/tmp/receiver-build.log', 'utf8'); } catch(e) {}
             try { slog = fs.readFileSync('/tmp/sender-build.log', 'utf8'); } catch(e) {}
-            const rtail = rlog.split('\n').slice(-80).join('\n').slice(0, 4000);
-            const stail = slog.split('\n').slice(-80).join('\n').slice(0, 4000);
+            const rtail = rlog.split('\n').slice(-200).join('\n').slice(0, 8000);
+            const stail = slog.split('\n').slice(-200).join('\n').slice(0, 8000);
             const body = `**Build failure logs**\n\n**Sender tail:**\n\`\`\`\n${stail}\n\`\`\`\n\n**Receiver tail:**\n\`\`\`\n${rtail}\n\`\`\``;
             await github.rest.repos.createCommitComment({
               owner: context.repo.owner,
