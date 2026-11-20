@@ -151,7 +151,7 @@ jobs:
         run: |
           echo "Posting build failure excerpt as commit comment..."
           if [ -f /tmp/sender-build.log ]; then
-            SENDER_E=$(grep -n "e: " /tmp/sender-build.log 2>&1 | head -n 40 || true)
+            SENDER_E=$(grep -n "^e: " /tmp/sender-build.log 2>&1 | head -n 40 || true)
             SENDER_CTX=""
             if [ -n "$SENDER_E" ]; then
               FIRST_LINE=$(echo "$SENDER_E" | head -n1 | cut -d: -f1)
@@ -163,7 +163,7 @@ jobs:
             SENDER_E="no sender log"; SENDER_CTX="no sender log"
           fi
           if [ -f /tmp/receiver-build.log ]; then
-            RECEIVER_E=$(grep -n "e: " /tmp/receiver-build.log 2>&1 | head -n 40 || true)
+            RECEIVER_E=$(grep -n "^e: " /tmp/receiver-build.log 2>&1 | head -n 40 || true)
             RECEIVER_CTX=""
             if [ -n "$RECEIVER_E" ]; then
               FIRST_LINE=$(echo "$RECEIVER_E" | head -n1 | cut -d: -f1)
