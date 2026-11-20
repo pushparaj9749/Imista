@@ -134,6 +134,24 @@ jobs:
               body: body
             });
 
+
+      - name: Push build logs to debug branch on failure
+        if: failure()
+        run: |
+          echo "Pushing logs to debug branch for inspection..."
+          git config user.name "ci-bot"
+          git config user.email "ci@imista.local"
+          mkdir -p /tmp/debug-logs
+          cp /tmp/sender-build.log /tmp/debug-logs/sender-build.log 2>/dev/null || echo "no sender log" > /tmp/debug-logs/sender-build.log
+          cp /tmp/receiver-build.log /tmp/debug-logs/receiver-build.log 2>/dev/null || echo "no receiver log" > /tmp/debug-logs/receiver-build.log
+          # Create branch debug-logs
+          git checkout -B debug-logs
+          mkdir -p debug-logs
+          cp /tmp/debug-logs/*.log debug-logs/ 2>/dev/null || true
+          git add debug-logs/
+          git commit -m "ci: upload build logs for failure diagnosis [skip ci]" || echo "no commit needed"
+          git push origin debug-logs --force || true
+
       - name: Upload Receiver build log to Gist on failure
         if: failure()
         env:
