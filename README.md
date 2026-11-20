@@ -15,9 +15,9 @@ Repository: `pushparaj9749/Imista` • Branch: `arena/cf8a3fb5-imista`
 secrets (Supabase). Pairing is one 6-digit code, like a WhatsApp login code.
 
 ### 1. Install Apps
-- Download from GitHub Releases (`v1.1.0`):
-  - `Imista-Forward-Sender-v1.1.0.apk`
-  - `Imista-Forward-Receiver-v1.1.0.apk`
+- Download from GitHub Releases (`v1.2.0`):
+  - `Imista-Forward-Sender-v1.2.0.apk`
+  - `Imista-Forward-Receiver-v1.2.0.apk`
 - Alternatively build locally (see Build section).
 
 Install **Sender** on the secondary (unused) phone, **Receiver** on your main phone.
@@ -26,6 +26,16 @@ Install **Sender** on the secondary (unused) phone, **Receiver** on your main ph
 1. Open **Sender** → Setup → tap **Naya code**. The relay mints a code such as `813593`.
 2. Open **Receiver** → **Connect Receiver** → type that code → **Connect**.
 3. Done. Sender's notifications now go Sender → relay → Receiver feed.
+
+### Sender after setup — black screen only
+- Every launch goes straight to a true-black screen. No gear, no buttons.
+- Faint on-screen info: battery %, charging, forwarded count, last-forward age.
+- **Hidden settings**: tap the `IMISTA` logo **6 times**.
+- Forwarding + the status heartbeat keep running in the background (boot receiver re-arms both).
+
+### Receiver sees the Sender phone
+Home card + **Sender Status** screen: battery %, charging, network, forwarding ON/OFF,
+notification access, sent count, free storage, uptime, model, last heartbeat (stale after 45 min).
 
 ### 3. Optional: also deliver to Telegram (no token typed anywhere)
 The relay holds `TELEGRAM_BOT_KEY` server-side. If it is configured:
