@@ -1,0 +1,6 @@
+-keep class com.imista.forward.sender.** { *; }
+-keep class com.imista.forward.shared.** { *; }
+-keep class androidx.datastore.** { *; }
+-keep class androidx.security.crypto.** { *; }
+-dontwarn org.bouncycastle.**
+-keepattributes Signature, InnerClasses, EnclosingMethod

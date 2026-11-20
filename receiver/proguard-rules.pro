@@ -1,0 +1,4 @@
+-keep class com.imista.forward.receiver.** { *; }
+-keep class com.imista.forward.shared.** { *; }
+-dontwarn org.bouncycastle.**
+-keepattributes Signature, InnerClasses, EnclosingMethod
